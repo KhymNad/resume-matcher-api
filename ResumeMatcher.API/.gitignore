@@ -1,0 +1,73 @@
+# =====================
+# Node / React stuff
+# =====================
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+/dist
+
+# misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =====================
+# ASP.NET Core stuff
+# =====================
+
+# Build output
+/bin/
+/obj/
+/out/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider IDE files
+.idea/
+
+# Publish directory
+/publish/
+
+# Resharper files
+_ReSharper*/
+
+# Logs
+*.log
+
+
+appsettings.Development.json
+# =====================
+# Misc
+# =====================
+
+# Mac system files
+.DS_Store
+
+# Ignore local database files
+/*.mdf
+/*.ldf
+
+# Ignore other env files
+/.env.*
+
