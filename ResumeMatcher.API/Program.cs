@@ -2,11 +2,14 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using ResumeMatcherAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Register Services
 builder.Services.AddControllers();
+builder.Services.AddHttpClient<HuggingFaceNlpService>();
+builder.Services.AddSingleton<FileTextExtractor>();
 
 // Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();
