@@ -15,6 +15,8 @@ namespace ResumeMatcherAPI.Services
         // The specific endpoint of the Hugging Face model
         private const string Endpoint = "https://api-inference.huggingface.co/models/dslim/bert-base-NER";
 
+
+
         /// <summary>
         /// Constructor that initializes the service with an injected HttpClient and configuration.
         /// </summary>

@@ -10,10 +10,10 @@ namespace ResumeMatcherAPI.Controllers
     [Route("api/[controller]")]
     public class ResumeController : ControllerBase
     {
-        private readonly HuggingFaceNlpService _huggingFace;
-        private readonly FileTextExtractor _extractor;
+        private readonly HuggingFaceNlpService _huggingFace; // Service to call Hugging Face API
+        private readonly FileTextExtractor _extractor;        // Service to extract text from resume files
 
-        // Inject both HuggingFaceNlpService and FileTextExtractor via constructor
+        // Constructor injects both HuggingFaceNlpService and FileTextExtractor
         public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor)
         {
             _huggingFace = huggingFace;
@@ -22,6 +22,7 @@ namespace ResumeMatcherAPI.Controllers
 
         /// <summary>
         /// Health check endpoint to verify API is running
+        /// GET /api/resume/health
         /// </summary>
         [HttpGet("health")]
         public IActionResult Health()
@@ -31,9 +32,8 @@ namespace ResumeMatcherAPI.Controllers
 
         /// <summary>
         /// POST /api/resume/upload
-        /// Accepts a resume file, extracts text based on file type,
-        /// sends the text to Hugging Face for Named Entity Recognition (NER),
-        /// groups entities by simplified categories, and returns them.
+        /// Accepts a resume file, extracts text, sends to Hugging Face NER,
+        /// groups entities by simplified labels, and returns them.
         /// </summary>
         [HttpPost("upload")]
         public async Task<IActionResult> UploadResume(IFormFile file)
@@ -41,39 +41,73 @@ namespace ResumeMatcherAPI.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            // Extract resume text based on file extension using FileTextExtractor service
             string resumeText;
             using (var stream = file.OpenReadStream())
             {
                 resumeText = _extractor.ExtractText(file.FileName, stream);
             }
 
-            // Send extracted resume text to Hugging Face NER model
+            resumeText = PreprocessExtractedText(resumeText);
+
+
             var nerJson = await _huggingFace.AnalyzeResumeText(resumeText);
 
-            // Deserialize the JSON response into a list of HuggingFaceEntity objects
             var entities = JsonConvert.DeserializeObject<List<HuggingFaceEntity>>(nerJson) ?? new List<HuggingFaceEntity>();
 
-            // Group entities by simplified label (e.g., remove "B-", "I-" prefixes)
+            // **Updated grouping logic using category mapping**
             var groupedEntities = entities
                 .Where(e => !string.IsNullOrEmpty(e.Entity))
-                .GroupBy(e => SimplifyEntityLabel(e.Entity))
+                .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity)))  // <-- Use MapToCategory here
                 .ToDictionary(
                     g => g.Key,
                     g => g.Select(x => x.Word).Distinct().ToList()
                 );
 
-            // Return the original file name and grouped entities in response
             return Ok(new
             {
                 fileName = file.FileName,
+                extractedText = resumeText,
                 groupedEntities
             });
         }
 
+        private string PreprocessExtractedText(string text)
+        {
+            // 1. Add space between lowercase and uppercase letter runs (camel case)
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?<=[a-z])(?=[A-Z])", " ");
+
+            // 2. Add space after punctuation if missing (e.g., between words and punctuation)
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"([.,:;!?])(?=\S)", "$1 ");
+
+            // 3. Normalize whitespace (replace multiple spaces/newlines with single space)
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+
+            // 4. Trim extra spaces from start/end
+            return text.Trim();
+        }
+
         /// <summary>
-        /// Helper to simplify entity labels by stripping "B-" and "I-" prefixes
-        /// to get clean category names like "ORG", "LOC", "PER", etc.
+        /// GET /api/resume/test-huggingface
+        /// Sends a sample string to Hugging Face to verify API connectivity and response.
+        /// </summary>
+        [HttpGet("test-huggingface")]
+        public async Task<IActionResult> TestHuggingFace()
+        {
+            string sample = "Jane Smith worked as a Data Scientist at Facebook and used Python and SQL for 5 years.";
+
+            try
+            {
+                var nerJson = await _huggingFace.AnalyzeResumeText(sample);
+                return Content(nerJson, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Hugging Face API call failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Helper to simplify entity labels by removing "B-" and "I-" prefixes.
         /// </summary>
         private string SimplifyEntityLabel(string label)
         {
@@ -81,10 +115,28 @@ namespace ResumeMatcherAPI.Controllers
                 return label.Substring(2);
             return label;
         }
+
+        /// <summary>
+        /// Helper to map raw entity labels to friendly category names.
+        /// Add or update mappings according to your model's entity labels.
+        /// </summary>
+        private string MapToCategory(string entityLabel)
+        {
+            return entityLabel switch
+            {
+                "SKILL" or "SKILLS" => "Skills",
+                "WORK_EXP" or "WORK_EXPERIENCE" or "EXPERIENCE" => "WorkExperience",
+                "EDUCATION" => "Education",
+                "ORG" or "ORGANIZATION" => "Organizations",
+                "PER" or "PERSON" => "Persons",
+                "LOC" or "LOCATION" => "Locations",
+                _ => "Other"
+            };
+        }
     }
 
     /// <summary>
-    /// Represents a single entity returned from Hugging Face NER model
+    /// Represents a single entity detected by Hugging Face NER model.
     /// </summary>
     public class HuggingFaceEntity
     {
