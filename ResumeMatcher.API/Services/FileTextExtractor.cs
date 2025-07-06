@@ -1,27 +1,31 @@
 using System.IO;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 using DocumentFormat.OpenXml.Packaging;
-using UglyToad.PdfPig;
+using Microsoft.AspNetCore.Http;
 
 namespace ResumeMatcherAPI.Services
 {
     public class FileTextExtractor
     {
-        public string ExtractText(string fileName, Stream fileStream)
+        public async Task<string> ExtractTextAsync(IFormFile file)
         {
-            var ext = Path.GetExtension(fileName).ToLower();
+            var ext = Path.GetExtension(file.FileName).ToLower();
 
             if (ext == ".pdf")
             {
-                return ExtractTextFromPdf(fileStream);
+                return await ExtractTextViaPythonAsync(file);
             }
             else if (ext == ".docx")
             {
-                return ExtractTextFromDocx(fileStream);
+                using var stream = file.OpenReadStream();
+                return ExtractTextFromDocx(stream);
             }
             else if (ext == ".txt")
             {
-                using var reader = new StreamReader(fileStream);
-                return reader.ReadToEnd();
+                using var reader = new StreamReader(file.OpenReadStream());
+                return await reader.ReadToEndAsync();
             }
             else
             {
@@ -29,15 +33,19 @@ namespace ResumeMatcherAPI.Services
             }
         }
 
-        private string ExtractTextFromPdf(Stream stream)
+        private async Task<string> ExtractTextViaPythonAsync(IFormFile file)
         {
-            using var pdf = PdfDocument.Open(stream);
-            var textBuilder = new System.Text.StringBuilder();
-            foreach (var page in pdf.GetPages())
-            {
-                textBuilder.AppendLine(page.Text);
-            }
-            return textBuilder.ToString();
+            using var httpClient = new HttpClient();
+            using var content = new MultipartFormDataContent();
+            using var stream = file.OpenReadStream();
+            content.Add(new StreamContent(stream), "file", file.FileName);
+
+            var response = await httpClient.PostAsync("http://localhost:5001/extract-resume", content);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(json);
+            return doc.RootElement.GetProperty("cleaned_text").GetString();
         }
 
         private string ExtractTextFromDocx(Stream stream)

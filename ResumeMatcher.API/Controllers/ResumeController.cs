@@ -41,23 +41,15 @@ namespace ResumeMatcherAPI.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
 
-            string resumeText;
-            using (var stream = file.OpenReadStream())
-            {
-                resumeText = _extractor.ExtractText(file.FileName, stream);
-            }
-
-            resumeText = PreprocessExtractedText(resumeText);
-
+            string resumeText = await _extractor.ExtractTextAsync(file);
 
             var nerJson = await _huggingFace.AnalyzeResumeText(resumeText);
 
             var entities = JsonConvert.DeserializeObject<List<HuggingFaceEntity>>(nerJson) ?? new List<HuggingFaceEntity>();
 
-            // **Updated grouping logic using category mapping**
             var groupedEntities = entities
                 .Where(e => !string.IsNullOrEmpty(e.Entity))
-                .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity)))  // <-- Use MapToCategory here
+                .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity)))
                 .ToDictionary(
                     g => g.Key,
                     g => g.Select(x => x.Word).Distinct().ToList()
@@ -69,21 +61,6 @@ namespace ResumeMatcherAPI.Controllers
                 extractedText = resumeText,
                 groupedEntities
             });
-        }
-
-        private string PreprocessExtractedText(string text)
-        {
-            // 1. Add space between lowercase and uppercase letter runs (camel case)
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?<=[a-z])(?=[A-Z])", " ");
-
-            // 2. Add space after punctuation if missing (e.g., between words and punctuation)
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"([.,:;!?])(?=\S)", "$1 ");
-
-            // 3. Normalize whitespace (replace multiple spaces/newlines with single space)
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
-
-            // 4. Trim extra spaces from start/end
-            return text.Trim();
         }
 
         /// <summary>
