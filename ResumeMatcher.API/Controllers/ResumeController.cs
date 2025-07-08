@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using ResumeMatcherAPI.Services;
+using System.Text.RegularExpressions;
 
 namespace ResumeMatcherAPI.Controllers
 {
@@ -45,14 +46,62 @@ namespace ResumeMatcherAPI.Controllers
 
             var nerJson = await _huggingFace.AnalyzeResumeText(resumeText);
 
-            var entities = JsonConvert.DeserializeObject<List<HuggingFaceEntity>>(nerJson) ?? new List<HuggingFaceEntity>();
+            var rawEntities = JsonConvert.DeserializeObject<List<HuggingFaceEntity>>(nerJson) ?? new List<HuggingFaceEntity>();
 
-            var groupedEntities = entities
-                .Where(e => !string.IsNullOrEmpty(e.Entity))
+            // Step: Sort by Start to ensure correct token order
+            rawEntities = rawEntities.OrderBy(e => e.Start).ToList();
+
+            // Step: Merge consecutive tokens with the same entity group
+            var mergedEntities = new List<HuggingFaceEntity>();
+            if (rawEntities.Count > 0)
+            {
+                var current = new HuggingFaceEntity
+                {
+                    Entity = rawEntities[0].Entity,
+                    Word = rawEntities[0].Word,
+                    Start = rawEntities[0].Start,
+                    End = rawEntities[0].End,
+                    Score = rawEntities[0].Score
+                };
+
+                for (int i = 1; i < rawEntities.Count; i++)
+                {
+                    var next = rawEntities[i];
+
+                    // Check if same entity group and tokens are consecutive
+                    if (SimplifyEntityLabel(next.Entity) == SimplifyEntityLabel(current.Entity) &&
+                        next.Start == current.End)
+                    {
+                        current.Word += next.Word;
+                        current.End = next.End;
+                        current.Score = Math.Min(current.Score, next.Score); // keep min confidence
+                    }
+                    else
+                    {
+                        mergedEntities.Add(current);
+                        current = new HuggingFaceEntity
+                        {
+                            Entity = next.Entity,
+                            Word = next.Word,
+                            Start = next.Start,
+                            End = next.End,
+                            Score = next.Score
+                        };
+                    }
+                }
+                mergedEntities.Add(current);
+            }
+
+            var groupedEntities = mergedEntities
+                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.90f)
                 .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity)))
                 .ToDictionary(
                     g => g.Key,
-                    g => g.Select(x => x.Word).Distinct().ToList()
+                    g => g
+                        .Select(x => CleanWord(x.Word))
+                        .Where(w => w.Length > 1 && !string.IsNullOrWhiteSpace(w))
+                        .Distinct()
+                        .ToList()
                 );
 
             return Ok(new
@@ -93,20 +142,27 @@ namespace ResumeMatcherAPI.Controllers
             return label;
         }
 
+        private string CleanWord(string word)
+        {
+            var cleaned = word.Trim().Replace("##", "").Replace(".", "");
+            return Regex.Replace(cleaned, @"[^a-zA-Z0-9\-\+\.#]", ""); // strip weird symbols
+        }
+
         /// <summary>
         /// Helper to map raw entity labels to friendly category names.
         /// Add or update mappings according to model's entity labels.
         /// </summary>
         private string MapToCategory(string entityLabel)
         {
-            return entityLabel switch
+            return entityLabel.ToUpper() switch
             {
-                "SKILL" or "SKILLS" => "Skills",
-                "WORK_EXP" or "WORK_EXPERIENCE" or "EXPERIENCE" => "WorkExperience",
-                "EDUCATION" => "Education",
-                "ORG" or "ORGANIZATION" => "Organizations",
                 "PER" or "PERSON" => "Persons",
+                "ORG" or "ORGANIZATION" => "Organizations",
                 "LOC" or "LOCATION" => "Locations",
+                "MISC" => "Skills", // can rename to "Skills" or "Technologies"
+                "SKILL" or "SKILLS" => "Skills",
+                "EXPERIENCE" or "WORK_EXP" or "WORK_EXPERIENCE" => "WorkExperience",
+                "EDUCATION" => "Education",
                 _ => "Other"
             };
         }
