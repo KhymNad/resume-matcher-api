@@ -13,8 +13,7 @@ namespace ResumeMatcherAPI.Services
         private readonly string? _apiKey;         // Hugging Face API key, loaded from configuration
 
         // The specific endpoint of the Hugging Face model
-        private const string Endpoint = "https://api-inference.huggingface.co/models/dslim/bert-base-NER";
-
+        private const string Endpoint = "https://api-inference.huggingface.co/models/Jean-Baptiste/roberta-large-ner-english";
 
 
         /// <summary>
@@ -37,24 +36,36 @@ namespace ResumeMatcherAPI.Services
         /// <returns>Raw JSON string containing the list of detected entities</returns>
         public async Task<string> AnalyzeResumeText(string resumeText)
         {
-            // Clear any existing headers and set the Bearer token for authentication
+            // Log the payload being sent
+            Console.WriteLine("==== Hugging Face Request Payload ====");
+            Console.WriteLine(resumeText);
+            Console.WriteLine("======================================");
+
+            // Clear any existing headers and set the Bearer token
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
-            // Create the request payload with the resume text
+            // Prepare the request body
             var requestBody = new { inputs = resumeText };
 
-            // Serialize the request to JSON and create the HTTP content with appropriate headers
+            // Serialize and set headers
             var content = new StringContent(JsonConvert.SerializeObject(requestBody), System.Text.Encoding.UTF8, "application/json");
 
-            // Send the POST request to the Hugging Face Inference API
+            // Send the POST request
             var response = await _httpClient.PostAsync(Endpoint, content);
 
-            // Throw an exception if the API response is not successful
+            // Read the response
+            var json = await response.Content.ReadAsStringAsync();
+
+            // Log the response
+            Console.WriteLine("==== Hugging Face API Response ====");
+            Console.WriteLine(json);
+            Console.WriteLine("===================================");
+
+            // Throw if unsuccessful
             response.EnsureSuccessStatusCode();
 
-            // Read and return the response content as a JSON string
-            return await response.Content.ReadAsStringAsync();
+            return json;
         }
     }
 }

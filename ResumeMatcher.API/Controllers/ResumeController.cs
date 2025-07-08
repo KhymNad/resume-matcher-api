@@ -95,7 +95,7 @@ namespace ResumeMatcherAPI.Controllers
 
         /// <summary>
         /// Helper to map raw entity labels to friendly category names.
-        /// Add or update mappings according to your model's entity labels.
+        /// Add or update mappings according to model's entity labels.
         /// </summary>
         private string MapToCategory(string entityLabel)
         {
@@ -117,14 +117,14 @@ namespace ResumeMatcherAPI.Controllers
     /// </summary>
     public class HuggingFaceEntity
     {
-        [JsonProperty("entity")]
-        public string Entity { get; set; } = string.Empty;
+        [JsonProperty("entity_group")]
+        public string Entity { get; set; }
+
+        [JsonProperty("word")]
+        public string Word { get; set; }
 
         [JsonProperty("score")]
         public float Score { get; set; }
-
-        [JsonProperty("word")]
-        public string Word { get; set; } = string.Empty;
 
         [JsonProperty("start")]
         public int Start { get; set; }
