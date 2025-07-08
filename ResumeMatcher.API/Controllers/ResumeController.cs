@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using ResumeMatcherAPI.Services;
 using System.Text.RegularExpressions;
 using System.Globalization;
+using ResumeMatcherAPI.Helpers;
 
 namespace ResumeMatcherAPI.Controllers
 {
@@ -14,14 +15,15 @@ namespace ResumeMatcherAPI.Controllers
     {
         private readonly HuggingFaceNlpService _huggingFace; // Service to call Hugging Face API
         private readonly FileTextExtractor _extractor;        // Service to extract text from resume files
+        private readonly ResumeSectionParser _sectionParser;  // Service to parse resume sections
 
         // Constructor injects both HuggingFaceNlpService and FileTextExtractor
-        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor)
+        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, ResumeSectionParser sectionParser)
         {
             _huggingFace = huggingFace;
             _extractor = extractor;
+            _sectionParser = sectionParser;
         }
-
         /// <summary>
         /// Health check endpoint to verify API is running
         /// GET /api/resume/health
@@ -46,12 +48,32 @@ namespace ResumeMatcherAPI.Controllers
             // Extract plain text from the uploaded resume file
             string resumeText = await _extractor.ExtractTextAsync(file);
 
+            // Split resume into logical sections (Skills, Experience, Education, etc.)
+            var sections = _sectionParser.SplitIntoSections(resumeText);
+
+            // Focus skill extraction on the most relevant parts (Skills and Experience)
+            string skillRelevantText = "";
+            if (sections.TryGetValue("Skills", out var skillsSection))
+                skillRelevantText += skillsSection + "\n";
+
+            if (sections.TryGetValue("Work Experience", out var workSection))
+                skillRelevantText += workSection + "\n";
+
+            if (sections.TryGetValue("Technical Skills", out var techSkillsSection))
+                skillRelevantText += techSkillsSection + "\n";
+
+            // If no useful section found, fall back to entire resume
+            if (string.IsNullOrWhiteSpace(skillRelevantText))
+                skillRelevantText = resumeText;
+
+            SkillMatcher.LoadSkills("Data/skills.txt");
+
             // List to collect entities from all chunks
             var allEntities = new List<HuggingFaceEntity>();
 
             // Split the resume text into smaller chunks to avoid API payload size limits
             // Adjust maxChunkSize as needed to fit model token limits (e.g., 1000 characters here)
-            var chunks = SplitTextIntoChunks(resumeText, 1000);
+            var chunks = SplitTextIntoChunks(skillRelevantText, 1000);
 
             // Call Hugging Face NER model for each chunk separately
             foreach (var chunk in chunks)
@@ -150,6 +172,21 @@ namespace ResumeMatcherAPI.Controllers
                     groupedEntities["Education"] = educationFallback;
             }
 
+            // Match known skills directly from resume text
+            var matchedSkills = SkillMatcher.MatchKnownSkills(resumeText);
+
+            if (!groupedEntities.ContainsKey("Skills"))
+                groupedEntities["Skills"] = matchedSkills;
+            else
+                groupedEntities["Skills"].AddRange(matchedSkills.Except(groupedEntities["Skills"]));
+
+            // Extract bullet points and match for additional skill hints
+            var bulletPoints = ExtractBulletPoints(resumeText);
+            var bulletSkills = bulletPoints.SelectMany(SkillMatcher.MatchKnownSkills).Distinct().ToList();
+
+            groupedEntities["Skills"].AddRange(bulletSkills.Except(groupedEntities["Skills"]));
+
+
             // Return the extracted text and grouped entities
             return Ok(new
             {
@@ -223,6 +260,15 @@ namespace ResumeMatcherAPI.Controllers
                 .Where(skill => skill.Length > 2 && !banned.Contains(skill.ToLower()))
                 .Select(skill => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(skill.ToLower()))
                 .Distinct()
+                .ToList();
+        }
+
+        private List<string> ExtractBulletPoints(string text)
+        {
+            var bulletRegex = new Regex(@"(?:•|\*|\-|\u2022)\s+(.*)", RegexOptions.Multiline);
+            return bulletRegex.Matches(text)
+                .Select(m => m.Groups[1].Value.Trim())
+                .Where(b => b.Length > 2)
                 .ToList();
         }
 

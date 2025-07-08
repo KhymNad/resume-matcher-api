@@ -1,0 +1,232 @@
+# Programming Languages
+C
+C++
+C#
+Java
+JavaScript
+TypeScript
+Python
+Ruby
+PHP
+Go
+Swift
+Kotlin
+Rust
+Perl
+Scala
+SQL
+R
+MATLAB
+Dart
+
+# Web Development
+HTML
+CSS
+SASS
+Bootstrap
+Tailwind CSS
+React
+Angular
+Vue.js
+Next.js
+Nuxt.js
+Express.js
+Node.js
+jQuery
+REST APIs
+GraphQL
+WebSockets
+
+# Databases
+MySQL
+PostgreSQL
+SQLite
+MongoDB
+Oracle
+SQL Server
+Firebase
+Redis
+Cassandra
+Elasticsearch
+
+# Cloud Platforms
+AWS
+Azure
+Google Cloud
+Heroku
+Netlify
+Vercel
+DigitalOcean
+Cloudflare
+
+# DevOps & Tools
+Docker
+Kubernetes
+CI/CD
+Jenkins
+GitHub Actions
+GitLab CI
+Terraform
+Ansible
+Bash
+Zsh
+Linux
+Shell Scripting
+
+# Version Control
+Git
+GitHub
+Bitbucket
+GitLab
+SVN
+
+# Data & Analytics
+Pandas
+NumPy
+Matplotlib
+Seaborn
+Scikit-learn
+TensorFlow
+Keras
+PyTorch
+Hugging Face
+OpenCV
+Power BI
+Tableau
+Excel
+Data Analysis
+Data Visualization
+Big Data
+ETL
+Apache Spark
+Apache Kafka
+
+# Machine Learning / AI
+Machine Learning
+Deep Learning
+Natural Language Processing
+Computer Vision
+Model Training
+Model Deployment
+Reinforcement Learning
+Model Evaluation
+Predictive Modeling
+
+# Cybersecurity
+Cybersecurity
+Information Security
+Penetration Testing
+Vulnerability Assessment
+SIEM
+Nmap
+Wireshark
+Metasploit
+OWASP
+SOC
+Firewalls
+Encryption
+
+# Project Management & Agile
+Agile
+Scrum
+Kanban
+Jira
+Confluence
+Trello
+Asana
+Project Management
+Product Management
+Business Analysis
+Stakeholder Management
+
+# Testing & QA
+Unit Testing
+Integration Testing
+E2E Testing
+TDD
+BDD
+Selenium
+JUnit
+Mocha
+Chai
+Jest
+Cypress
+Playwright
+Postman
+
+# Design & UX
+Figma
+Sketch
+Adobe XD
+Adobe Photoshop
+Adobe Illustrator
+Wireframing
+Prototyping
+User Experience
+User Interface
+Design Thinking
+
+# Soft Skills
+Communication
+Teamwork
+Collaboration
+Leadership
+Problem Solving
+Critical Thinking
+Time Management
+Adaptability
+Creativity
+Conflict Resolution
+Presentation Skills
+Decision Making
+
+# Mobile Development
+Android
+iOS
+React Native
+Flutter
+SwiftUI
+Xamarin
+
+# Business / Domain-Specific
+E-commerce
+CRM
+ERP
+Salesforce
+HubSpot
+Shopify
+WordPress
+Magento
+QuickBooks
+SAP
+Healthcare IT
+FinTech
+EdTech
+LegalTech
+Cloud Security
+Data Governance
+
+# Other Tools & Tech
+Notion
+Slack
+Zoom
+Microsoft Teams
+VS Code
+IntelliJ
+Eclipse
+Visual Studio
+Xcode
+PostgreSQL
+Docker Compose
+Makefiles
+WebPack
+Babel
+ESLint
+Prettier
+RESTful APIs
+JSON
+YAML
+XML
+OAuth
+JWT
+SAML

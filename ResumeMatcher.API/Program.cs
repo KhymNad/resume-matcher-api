@@ -10,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddHttpClient<HuggingFaceNlpService>();
 builder.Services.AddSingleton<FileTextExtractor>();
+builder.Services.AddScoped<ResumeSectionParser>();
 
 // Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();
