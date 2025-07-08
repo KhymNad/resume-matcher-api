@@ -42,16 +42,42 @@ namespace ResumeMatcherAPI.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
 
+            // Extract plain text from the uploaded resume file
             string resumeText = await _extractor.ExtractTextAsync(file);
 
-            var nerJson = await _huggingFace.AnalyzeResumeText(resumeText);
+            // List to collect entities from all chunks
+            var allEntities = new List<HuggingFaceEntity>();
 
-            var rawEntities = JsonConvert.DeserializeObject<List<HuggingFaceEntity>>(nerJson) ?? new List<HuggingFaceEntity>();
+            // Split the resume text into smaller chunks to avoid API payload size limits
+            // Adjust maxChunkSize as needed to fit model token limits (e.g., 1000 characters here)
+            var chunks = SplitTextIntoChunks(resumeText, 1000);
 
-            // Step: Sort by Start to ensure correct token order
-            rawEntities = rawEntities.OrderBy(e => e.Start).ToList();
+            // Call Hugging Face NER model for each chunk separately
+            foreach (var chunk in chunks)
+            {
+                var nerJson = await _huggingFace.AnalyzeResumeText(chunk);
 
-            // Step: Merge consecutive tokens with the same entity group
+                // Deserialize entities detected in this chunk
+                var chunkEntities = JsonConvert.DeserializeObject<List<HuggingFaceEntity>>(nerJson) ?? new List<HuggingFaceEntity>();
+
+                // Adjust Start and End offsets of each entity relative to full resume text
+                // This is critical so merged entities have global positions, not chunk-local
+                int chunkStartIndex = resumeText.IndexOf(chunk, StringComparison.Ordinal);
+
+                foreach (var entity in chunkEntities)
+                {
+                    entity.Start += chunkStartIndex;
+                    entity.End += chunkStartIndex;
+                }
+
+                // Add chunk entities to the aggregate list
+                allEntities.AddRange(chunkEntities);
+            }
+
+            // Sort all entities by their start index for proper sequential processing
+            var rawEntities = allEntities.OrderBy(e => e.Start).ToList();
+
+            // Merge consecutive tokens with the same entity group into one entity
             var mergedEntities = new List<HuggingFaceEntity>();
             if (rawEntities.Count > 0)
             {
@@ -92,6 +118,7 @@ namespace ResumeMatcherAPI.Controllers
                 mergedEntities.Add(current);
             }
 
+            // Group entities by simplified category labels and filter by confidence threshold
             var groupedEntities = mergedEntities
                 .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.90f)
                 .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity)))
@@ -104,6 +131,7 @@ namespace ResumeMatcherAPI.Controllers
                         .ToList()
                 );
 
+            // Return the extracted text and grouped entities
             return Ok(new
             {
                 fileName = file.FileName,
@@ -129,6 +157,33 @@ namespace ResumeMatcherAPI.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, $"Hugging Face API call failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Helper method to split large text into smaller chunks for API calls.
+        /// Tries to split at whitespace to avoid breaking words.
+        /// </summary>
+        private IEnumerable<string> SplitTextIntoChunks(string text, int maxChunkSize = 1000)
+        {
+            if (string.IsNullOrEmpty(text))
+                yield break;
+
+            int offset = 0;
+            while (offset < text.Length)
+            {
+                int length = Math.Min(maxChunkSize, text.Length - offset);
+
+                // Try to break on last whitespace inside maxChunkSize
+                if (offset + length < text.Length)
+                {
+                    int lastSpace = text.LastIndexOf(' ', offset + length);
+                    if (lastSpace > offset)
+                        length = lastSpace - offset;
+                }
+
+                yield return text.Substring(offset, length).Trim();
+                offset += length;
             }
         }
 
