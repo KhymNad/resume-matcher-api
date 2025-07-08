@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using ResumeMatcherAPI.Services;
 using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace ResumeMatcherAPI.Controllers
 {
@@ -131,6 +132,24 @@ namespace ResumeMatcherAPI.Controllers
                         .ToList()
                 );
 
+            // Clean up Skills list (remove generic words, normalize casing)
+            if (groupedEntities.ContainsKey("Skills"))
+            {
+                groupedEntities["Skills"] = CleanSkillList(groupedEntities["Skills"]);
+            }
+
+            // Fallback detection for missing Education entities using regex
+            if (!groupedEntities.ContainsKey("Education") || groupedEntities["Education"].Count == 0)
+            {
+                var educationFallback = Regex.Matches(resumeText, @"(Bachelor|Master|B\.Sc|M\.Sc|University|College|Diploma)", RegexOptions.IgnoreCase)
+                    .Select(m => m.Value)
+                    .Distinct()
+                    .ToList();
+
+                if (educationFallback.Any())
+                    groupedEntities["Education"] = educationFallback;
+            }
+
             // Return the extracted text and grouped entities
             return Ok(new
             {
@@ -197,6 +216,16 @@ namespace ResumeMatcherAPI.Controllers
             return label;
         }
 
+        private List<string> CleanSkillList(List<string> skills)
+        {
+            var banned = new[] { "team", "work", "project", "experience", "management" };
+            return skills
+                .Where(skill => skill.Length > 2 && !banned.Contains(skill.ToLower()))
+                .Select(skill => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(skill.ToLower()))
+                .Distinct()
+                .ToList();
+        }
+
         private string CleanWord(string word)
         {
             var cleaned = word.Trim().Replace("##", "").Replace(".", "");
@@ -214,10 +243,10 @@ namespace ResumeMatcherAPI.Controllers
                 "PER" or "PERSON" => "Persons",
                 "ORG" or "ORGANIZATION" => "Organizations",
                 "LOC" or "LOCATION" => "Locations",
-                "MISC" => "Skills", // can rename to "Skills" or "Technologies"
-                "SKILL" or "SKILLS" => "Skills",
-                "EXPERIENCE" or "WORK_EXP" or "WORK_EXPERIENCE" => "WorkExperience",
-                "EDUCATION" => "Education",
+                "MISC" => "Skills",
+                "SKILL" or "SKILLS" or "TECH" or "TECHNOLOGY" => "Skills",
+                "JOB" or "ROLE" or "TITLE" or "POSITION" or "OCCUPATION" or "WORK_EXP" or "WORK_EXPERIENCE" => "WorkExperience",
+                "EDU" or "EDUCATION" or "SCHOOL" or "DEGREE" => "Education",
                 _ => "Other"
             };
         }

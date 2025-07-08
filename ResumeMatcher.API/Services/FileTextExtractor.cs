@@ -45,7 +45,7 @@ namespace ResumeMatcherAPI.Services
 
             var json = await response.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(json);
-            return doc.RootElement.GetProperty("cleaned_text").GetString();
+            return doc.RootElement.GetProperty("cleaned_text").GetString() ?? string.Empty;
         }
 
         private string ExtractTextFromDocx(Stream stream)
