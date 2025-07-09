@@ -35,6 +35,26 @@ namespace ResumeMatcherAPI.Controllers
         }
 
         /// <summary>
+        /// GET /api/resume/test-huggingface
+        /// Sends a sample string to Hugging Face to verify API connectivity and response.
+        /// </summary>
+        [HttpGet("test-huggingface")]
+        public async Task<IActionResult> TestHuggingFace()
+        {
+            string sample = "Jane Smith worked as a Data Scientist at Facebook and used Python and SQL for 5 years.";
+
+            try
+            {
+                var nerJson = await _huggingFace.AnalyzeResumeText(sample);
+                return Content(nerJson, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Hugging Face API call failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// POST /api/resume/upload
         /// Accepts a resume file, extracts text, sends to Hugging Face NER,
         /// groups entities by simplified labels, and returns them.
@@ -197,26 +217,6 @@ namespace ResumeMatcherAPI.Controllers
         }
 
         /// <summary>
-        /// GET /api/resume/test-huggingface
-        /// Sends a sample string to Hugging Face to verify API connectivity and response.
-        /// </summary>
-        [HttpGet("test-huggingface")]
-        public async Task<IActionResult> TestHuggingFace()
-        {
-            string sample = "Jane Smith worked as a Data Scientist at Facebook and used Python and SQL for 5 years.";
-
-            try
-            {
-                var nerJson = await _huggingFace.AnalyzeResumeText(sample);
-                return Content(nerJson, "application/json");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Hugging Face API call failed: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// Helper method to split large text into smaller chunks for API calls.
         /// Tries to split at whitespace to avoid breaking words.
         /// </summary>
@@ -253,6 +253,12 @@ namespace ResumeMatcherAPI.Controllers
             return label;
         }
 
+        /// <summary>
+        /// Cleans and normalizes a list of skill strings by removing banned words,
+        /// formatting casing to title case, and eliminating duplicates.
+        /// </summary>
+        /// <param name="skills">List of raw skill strings</param>
+        /// <returns>Cleaned list of formatted skill names</returns>
         private List<string> CleanSkillList(List<string> skills)
         {
             var banned = new[] { "team", "work", "project", "experience", "management" };
@@ -263,6 +269,12 @@ namespace ResumeMatcherAPI.Controllers
                 .ToList();
         }
 
+        /// <summary>
+        /// Extracts bullet-pointed lines from the resume text for further processing.
+        /// Supports common bullet styles like •, *, -, and Unicode bullets.
+        /// </summary>
+        /// <param name="text">The raw resume text</param>
+        /// <returns>List of bullet point lines</returns>
         private List<string> ExtractBulletPoints(string text)
         {
             var bulletRegex = new Regex(@"(?:•|\*|\-|\u2022)\s+(.*)", RegexOptions.Multiline);
@@ -272,6 +284,12 @@ namespace ResumeMatcherAPI.Controllers
                 .ToList();
         }
 
+        /// <summary>
+        /// Cleans a word by removing unwanted characters and token artifacts like "##".
+        /// Also strips symbols and punctuation not part of common skill names.
+        /// </summary>
+        /// <param name="word">The raw word token</param>
+        /// <returns>Cleaned version of the word</returns>
         private string CleanWord(string word)
         {
             var cleaned = word.Trim().Replace("##", "").Replace(".", "");
@@ -304,10 +322,10 @@ namespace ResumeMatcherAPI.Controllers
     public class HuggingFaceEntity
     {
         [JsonProperty("entity_group")]
-        public string Entity { get; set; }
+        public string? Entity { get; set; }
 
         [JsonProperty("word")]
-        public string Word { get; set; }
+        public string? Word { get; set; }
 
         [JsonProperty("score")]
         public float Score { get; set; }
