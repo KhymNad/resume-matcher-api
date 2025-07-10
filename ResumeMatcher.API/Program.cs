@@ -3,14 +3,20 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ResumeMatcherAPI.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Register additional encodings (fixes 'utf8' bug)
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 // Register Services
 builder.Services.AddControllers();
 builder.Services.AddHttpClient<HuggingFaceNlpService>();
 builder.Services.AddSingleton<FileTextExtractor>();
 builder.Services.AddScoped<ResumeSectionParser>();
+builder.Services.AddHttpClient<AdzunaJobService>();
+builder.Services.AddSingleton<AdzunaJobService>();
 
 // Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();

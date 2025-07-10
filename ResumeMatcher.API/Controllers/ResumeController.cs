@@ -16,13 +16,15 @@ namespace ResumeMatcherAPI.Controllers
         private readonly HuggingFaceNlpService _huggingFace; // Service to call Hugging Face API
         private readonly FileTextExtractor _extractor;        // Service to extract text from resume files
         private readonly ResumeSectionParser _sectionParser;  // Service to parse resume sections
+        private readonly AdzunaJobService _adzunaJobService; // Service to get job postings
 
         // Constructor injects both HuggingFaceNlpService and FileTextExtractor
-        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, ResumeSectionParser sectionParser)
+        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, ResumeSectionParser sectionParser, AdzunaJobService adzunaJobService)
         {
             _huggingFace = huggingFace;
             _extractor = extractor;
             _sectionParser = sectionParser;
+            _adzunaJobService = adzunaJobService;
         }
         /// <summary>
         /// Health check endpoint to verify API is running
@@ -53,6 +55,43 @@ namespace ResumeMatcherAPI.Controllers
                 return StatusCode(500, $"Hugging Face API call failed: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// POST /api/resume/upload-with-jobs
+        /// Uploads a resume, extracts structured data, and fetches relevant job postings.
+        /// </summary>
+        [HttpPost("upload-with-jobs")]
+        public async Task<IActionResult> UploadResumeWithJobs(IFormFile file)
+        {
+            var uploadResult = await UploadResume(file) as OkObjectResult;
+
+            if (uploadResult == null || uploadResult.Value == null)
+                return StatusCode(500, "Resume parsing failed.");
+
+            var parsedResult = JsonConvert.DeserializeObject<ResumeParsedResult>(JsonConvert.SerializeObject(uploadResult.Value));
+            var groupedEntities = parsedResult?.GroupedEntities;
+
+            if (parsedResult == null || groupedEntities == null)
+                return BadRequest("Unable to extract structured data from resume.");
+
+            // Extract skills and locations
+            var skills = groupedEntities.TryGetValue("Skills", out var skillsList) ? skillsList : new List<string>();
+            var locations = groupedEntities.TryGetValue("Locations", out var locationList) ? locationList : new List<string>();
+
+            // Use most specific location for display purposes, if needed
+            var displayLocation = locations.LastOrDefault() ?? "Canada";
+
+            // Fetch jobs from Adzuna using skills and locations
+            var jobResults = await _adzunaJobService.SearchJobsAsync(skills, locations);
+
+            return Ok(new
+            {
+                parsedResult.FileName,
+                groupedEntities,
+                jobResults
+            });
+        }
+
 
         /// <summary>
         /// POST /api/resume/upload
@@ -211,7 +250,7 @@ namespace ResumeMatcherAPI.Controllers
             return Ok(new
             {
                 fileName = file.FileName,
-                extractedText = resumeText,
+                // extractedText = resumeText,
                 groupedEntities
             });
         }
@@ -336,4 +375,15 @@ namespace ResumeMatcherAPI.Controllers
         [JsonProperty("end")]
         public int End { get; set; }
     }
+
+
+    public class ResumeParsedResult
+    {
+        [JsonProperty("fileName")]
+        public string? FileName { get; set; }
+
+        [JsonProperty("groupedEntities")]
+        public Dictionary<string, List<string>>? GroupedEntities { get; set; }
+    }
+
 }
