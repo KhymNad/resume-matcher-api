@@ -13,8 +13,8 @@ namespace ResumeMatcherAPI.Services
         private readonly string? _apiKey;         // Hugging Face API key, loaded from configuration
 
         // The specific endpoint of the Hugging Face model
-        private const string Endpoint = "https://api-inference.huggingface.co/models/Jean-Baptiste/roberta-large-ner-english";
-
+        private const string Endpoint = "https://api-inference.huggingface.co/models/dslim/bert-base-NER";
+        // private const string Endpoint = "https://api-inference.huggingface.co/models/julien-c/roberta-large-recruiter-ner";
 
         /// <summary>
         /// Constructor that initializes the service with an injected HttpClient and configuration.

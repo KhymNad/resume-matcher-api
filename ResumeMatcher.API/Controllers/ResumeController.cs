@@ -15,16 +15,23 @@ namespace ResumeMatcherAPI.Controllers
     {
         private readonly HuggingFaceNlpService _huggingFace; // Service to call Hugging Face API
         private readonly FileTextExtractor _extractor;        // Service to extract text from resume files
-        private readonly ResumeSectionParser _sectionParser;  // Service to parse resume sections
         private readonly AdzunaJobService _adzunaJobService; // Service to get job postings
 
-        // Constructor injects both HuggingFaceNlpService and FileTextExtractor
-        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, ResumeSectionParser sectionParser, AdzunaJobService adzunaJobService)
+        private readonly SkillService _skillService; // Service to get Skills from Supabase DB
+
+        private readonly string _dbConnectionString;
+
+        // Constructor injects all required services
+        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, AdzunaJobService adzunaJobService, SkillService skillService, IConfiguration configuration)
         {
             _huggingFace = huggingFace;
             _extractor = extractor;
-            _sectionParser = sectionParser;
             _adzunaJobService = adzunaJobService;
+            _skillService = skillService;
+            _dbConnectionString = configuration.GetConnectionString("Supabase") ?? throw new InvalidOperationException("Supabase connection string is missing.");
+
+            // Load skills once on controller startup
+            SkillMatcher.LoadSkillsFromDb(_dbConnectionString);
         }
         /// <summary>
         /// Health check endpoint to verify API is running
@@ -107,32 +114,16 @@ namespace ResumeMatcherAPI.Controllers
             // Extract plain text from the uploaded resume file
             string resumeText = await _extractor.ExtractTextAsync(file);
 
-            // Split resume into logical sections (Skills, Experience, Education, etc.)
-            var sections = _sectionParser.SplitIntoSections(resumeText);
-
-            // Focus skill extraction on the most relevant parts (Skills and Experience)
-            string skillRelevantText = "";
-            if (sections.TryGetValue("Skills", out var skillsSection))
-                skillRelevantText += skillsSection + "\n";
-
-            if (sections.TryGetValue("Work Experience", out var workSection))
-                skillRelevantText += workSection + "\n";
-
-            if (sections.TryGetValue("Technical Skills", out var techSkillsSection))
-                skillRelevantText += techSkillsSection + "\n";
-
-            // If no useful section found, fall back to entire resume
-            if (string.IsNullOrWhiteSpace(skillRelevantText))
-                skillRelevantText = resumeText;
-
-            SkillMatcher.LoadSkills("Data/skills.txt");
+            // SkillMatcher.LoadSkills("Data/skills.txt");
+            var knownSkills = await _skillService.GetAllSkillsAsync();
+            SkillMatcher.LoadSkillsFromDb(_dbConnectionString);
 
             // List to collect entities from all chunks
             var allEntities = new List<HuggingFaceEntity>();
 
             // Split the resume text into smaller chunks to avoid API payload size limits
             // Adjust maxChunkSize as needed to fit model token limits (e.g., 1000 characters here)
-            var chunks = SplitTextIntoChunks(skillRelevantText, 1000);
+            var chunks = SplitTextIntoChunks(resumeText, 1000);
 
             // Call Hugging Face NER model for each chunk separately
             foreach (var chunk in chunks)
@@ -177,7 +168,7 @@ namespace ResumeMatcherAPI.Controllers
                     var next = rawEntities[i];
 
                     // Check if same entity group and tokens are consecutive
-                    if (SimplifyEntityLabel(next.Entity) == SimplifyEntityLabel(current.Entity) &&
+                    if (SimplifyEntityLabel(next.Entity ?? string.Empty) == SimplifyEntityLabel(current.Entity ?? string.Empty) &&
                         next.Start == current.End)
                     {
                         current.Word += next.Word;
@@ -203,11 +194,11 @@ namespace ResumeMatcherAPI.Controllers
             // Group entities by simplified category labels and filter by confidence threshold
             var groupedEntities = mergedEntities
                 .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.90f)
-                .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity)))
+                .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity ?? string.Empty)))
                 .ToDictionary(
                     g => g.Key,
                     g => g
-                        .Select(x => CleanWord(x.Word))
+                        .Select(x => CleanWord(x.Word ?? string.Empty))
                         .Where(w => w.Length > 1 && !string.IsNullOrWhiteSpace(w))
                         .Distinct()
                         .ToList()
@@ -250,7 +241,7 @@ namespace ResumeMatcherAPI.Controllers
             return Ok(new
             {
                 fileName = file.FileName,
-                // extractedText = resumeText,
+                extractedText = resumeText,
                 groupedEntities
             });
         }

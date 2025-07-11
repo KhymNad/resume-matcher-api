@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ResumeMatcherAPI.Services;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,9 +16,12 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 builder.Services.AddControllers();
 builder.Services.AddHttpClient<HuggingFaceNlpService>();
 builder.Services.AddSingleton<FileTextExtractor>();
-builder.Services.AddScoped<ResumeSectionParser>();
 builder.Services.AddHttpClient<AdzunaJobService>();
 builder.Services.AddSingleton<AdzunaJobService>();
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddScoped<SkillService>();
+
 
 // Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();
