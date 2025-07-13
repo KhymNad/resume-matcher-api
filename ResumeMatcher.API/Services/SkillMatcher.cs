@@ -144,7 +144,7 @@ namespace ResumeMatcherAPI.Helpers
         /// <summary>
         /// Matches skills using NER input, substring/n-gram detection.
         /// </summary>
-        public static List<MatchedSkill> MatchSkills(string resumeText, List<string> nerSkills = null)
+        public static List<MatchedSkill> MatchSkills(string resumeText, List<string>? nerSkills = null)
         {
             var matched = new List<MatchedSkill>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
