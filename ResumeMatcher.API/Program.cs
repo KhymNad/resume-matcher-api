@@ -10,6 +10,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Npgsql;
 using Pgvector;
 
+DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
