@@ -18,8 +18,7 @@ namespace ResumeMatcherAPI.Controllers
         private readonly AdzunaJobService _adzunaJobService; // Service to get job postings
 
         //private readonly SkillService _skillService; // Service to get Skills from Supabase DB
-
-        private readonly string _dbConnectionString;
+        //private readonly string _dbConnectionString;
 
         // Constructor injects all required services
         public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, AdzunaJobService adzunaJobService, SkillService skillService, IConfiguration configuration)
@@ -28,10 +27,10 @@ namespace ResumeMatcherAPI.Controllers
             _extractor = extractor;
             _adzunaJobService = adzunaJobService;
             //_skillService = skillService;
-            _dbConnectionString = configuration.GetConnectionString("Supabase") ?? throw new InvalidOperationException("Supabase connection string is missing.");
+            //_dbConnectionString = configuration.GetConnectionString("Supabase") ?? throw new InvalidOperationException("Supabase connection string is missing.");
 
             // Load skills once on controller startup
-            SkillMatcher.LoadSkillsFromDb(_dbConnectionString);
+            // SkillMatcher.LoadSkillsFromDb(_dbConnectionString);
         }
         /// <summary>
         /// Health check endpoint to verify API is running
@@ -97,7 +96,6 @@ namespace ResumeMatcherAPI.Controllers
             });
         }
 
-
         /// <summary>
         /// POST /api/resume/upload
         /// Accepts a resume file, extracts text, sends to Hugging Face NER,
@@ -110,7 +108,7 @@ namespace ResumeMatcherAPI.Controllers
                 return BadRequest("No file uploaded.");
 
             string resumeText = await _extractor.ExtractTextAsync(file);    // Extract plain text from the uploaded resume file
-            SkillMatcher.LoadSkillsFromDb(_dbConnectionString);  // Load skills from the database for skill matching
+            // SkillMatcher.LoadSkillsFromDb(_dbConnectionString);  // Load skills from the database for skill matching
 
             var allEntities = new List<HuggingFaceEntity>();
             var chunks = ResumeControllerHelpers.SplitTextIntoChunks(resumeText, 1000); // Split resume text into manageable chunks to avoid exceeding API limits
