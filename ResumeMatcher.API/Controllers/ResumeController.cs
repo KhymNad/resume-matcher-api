@@ -99,7 +99,6 @@ namespace ResumeMatcherAPI.Controllers
             });
         }
 
-
         /// <summary>
         /// POST /api/resume/upload
         /// Accepts a resume file, extracts text, sends to Hugging Face NER,
@@ -108,143 +107,52 @@ namespace ResumeMatcherAPI.Controllers
         [HttpPost("upload")]
         public async Task<IActionResult> UploadResume(IFormFile file)
         {
-            if (file == null || file.Length == 0)
+            if (file == null || file.Length == 0)   // Validate that a file was uploaded
                 return BadRequest("No file uploaded.");
 
-            // Extract plain text from the uploaded resume file
-            string resumeText = await _extractor.ExtractTextAsync(file);
+            string resumeText = await _extractor.ExtractTextAsync(file);    // Extract plain text from the uploaded resume file
+            SkillMatcher.LoadSkillsFromDb(_dbConnectionString);  // Load skills from the database for skill matching
 
-            // SkillMatcher.LoadSkills("Data/skills.txt");
-            SkillMatcher.LoadSkillsFromDb(_dbConnectionString);
-
-            // List to collect entities from all chunks
             var allEntities = new List<HuggingFaceEntity>();
+            var chunks = ResumeControllerHelpers.SplitTextIntoChunks(resumeText, 1000); // Split resume text into manageable chunks to avoid exceeding API limits
 
-            // Split the resume text into smaller chunks to avoid API payload size limits
-            // Adjust maxChunkSize as needed to fit model token limits (e.g., 1000 characters here)
-            var chunks = SplitTextIntoChunks(resumeText, 1000);
-
-            // Call Hugging Face NER model for each chunk separately
+            // Analyze each chunk using Hugging Face NER and collect all entities
             foreach (var chunk in chunks)
             {
                 var nerJson = await _huggingFace.AnalyzeResumeText(chunk);
-
-                // Deserialize entities detected in this chunk
                 var chunkEntities = JsonConvert.DeserializeObject<List<HuggingFaceEntity>>(nerJson) ?? new List<HuggingFaceEntity>();
 
-                // Adjust Start and End offsets of each entity relative to full resume text
-                // This is critical so merged entities have global positions, not chunk-local
-                int chunkStartIndex = resumeText.IndexOf(chunk, StringComparison.Ordinal);
-
-                foreach (var entity in chunkEntities)
-                {
-                    entity.Start += chunkStartIndex;
-                    entity.End += chunkStartIndex;
-                }
-
-                // Add chunk entities to the aggregate list
+                // Adjust entity start/end positions to match original text offsets
+                ResumeControllerHelpers.AdjustEntityOffsets(chunkEntities, resumeText, chunk);
                 allEntities.AddRange(chunkEntities);
             }
 
-            // Sort all entities by their start index for proper sequential processing
+            // Sort and merge consecutive entity tokens into complete entities
             var rawEntities = allEntities.OrderBy(e => e.Start).ToList();
+            var mergedEntities = ResumeControllerHelpers.MergeConsecutiveEntities(rawEntities);
+            var groupedEntities = ResumeControllerHelpers.GroupAndCleanEntities(mergedEntities);    // Group entities by type (e.g., Skills, Education) and clean them
 
-            // Merge consecutive tokens with the same entity group into one entity
-            var mergedEntities = new List<HuggingFaceEntity>();
-            if (rawEntities.Count > 0)
-            {
-                var current = new HuggingFaceEntity
-                {
-                    Entity = rawEntities[0].Entity,
-                    Word = rawEntities[0].Word,
-                    Start = rawEntities[0].Start,
-                    End = rawEntities[0].End,
-                    Score = rawEntities[0].Score
-                };
+            // Use regex-based fallback to detect education if model missed it
+            ResumeControllerHelpers.FallbackEducationDetection(resumeText, groupedEntities);
 
-                for (int i = 1; i < rawEntities.Count; i++)
-                {
-                    var next = rawEntities[i];
-
-                    // Check if same entity group and tokens are consecutive
-                    if (SimplifyEntityLabel(next.Entity ?? string.Empty) == SimplifyEntityLabel(current.Entity ?? string.Empty) &&
-                        next.Start == current.End)
-                    {
-                        current.Word += next.Word;
-                        current.End = next.End;
-                        current.Score = Math.Min(current.Score, next.Score); // keep min confidence
-                    }
-                    else
-                    {
-                        mergedEntities.Add(current);
-                        current = new HuggingFaceEntity
-                        {
-                            Entity = next.Entity,
-                            Word = next.Word,
-                            Start = next.Start,
-                            End = next.End,
-                            Score = next.Score
-                        };
-                    }
-                }
-                mergedEntities.Add(current);
-            }
-
-            // Group entities by simplified category labels and filter by confidence threshold
-            var groupedEntities = mergedEntities
-                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.96f)
-                .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity ?? string.Empty)))
-                .ToDictionary(
-                    g => g.Key,
-                    g => g
-                        .Select(x => CleanWord(x.Word ?? string.Empty))
-                        .Where(w => w.Length > 1 && !string.IsNullOrWhiteSpace(w))
-                        .Distinct()
-                        .ToList()
-                );
-
-            // Clean up Skills list (remove generic words, normalize casing)
-            if (groupedEntities.ContainsKey("Skills"))
-            {
-                groupedEntities["Skills"] = CleanSkillList(groupedEntities["Skills"]);
-            }
-
-            // Fallback detection for missing Education entities using regex
-            if (!groupedEntities.ContainsKey("Education") || groupedEntities["Education"].Count == 0)
-            {
-                var educationFallback = Regex.Matches(resumeText, @"(Bachelor|Master|B\.Sc|M\.Sc|University|College|Diploma)", RegexOptions.IgnoreCase)
-                    .Select(m => m.Value)
-                    .Distinct()
-                    .ToList();
-
-                if (educationFallback.Any())
-                    groupedEntities["Education"] = educationFallback;
-            }
-
-            // Collect NER-labeled skills (entity = "Skills" category)
+            // Extract skills identified from the NER model
             var nerSkills = groupedEntities.ContainsKey("Skills") ? groupedEntities["Skills"] : new List<string>();
+            var matchedSkillObjs = SkillMatcher.MatchSkills(resumeText, nerSkills); // Match NER + fuzzy skills against database skill list
 
-            // Perform full skill matching (NER + substring + embedding)
-            var matchedSkillObjs = SkillMatcher.MatchSkills(resumeText, nerSkills);
-
-            // Replace "Skills" in groupedEntities with cleaned list
             groupedEntities["Skills"] = matchedSkillObjs
                 .Select(s => s.Skill)
                 .Distinct()
                 .OrderBy(s => s)
                 .ToList();
 
-            // include full skill object with source info in response
             var detailedSkills = matchedSkillObjs
-                .OrderByDescending(s => s.Score ?? 1) // prefer scored matches first
                 .Select(s => new
                 {
                     s.Skill,
                     s.Source,
-                    Score = s.Score?.ToString("0.00") ?? null
+                    Score = (string?)null
                 });
 
-            // Return the extracted text and grouped entities
             return Ok(new
             {
                 fileName = file.FileName,
@@ -253,90 +161,6 @@ namespace ResumeMatcherAPI.Controllers
                 groupedEntities,
                 detailedSkills
             });
-        }
-
-        /// <summary>
-        /// Helper method to split large text into smaller chunks for API calls.
-        /// Tries to split at whitespace to avoid breaking words.
-        /// </summary>
-        private IEnumerable<string> SplitTextIntoChunks(string text, int maxChunkSize = 1000)
-        {
-            if (string.IsNullOrEmpty(text))
-                yield break;
-
-            int offset = 0;
-            while (offset < text.Length)
-            {
-                int length = Math.Min(maxChunkSize, text.Length - offset);
-
-                // Try to break on last whitespace inside maxChunkSize
-                if (offset + length < text.Length)
-                {
-                    int lastSpace = text.LastIndexOf(' ', offset + length);
-                    if (lastSpace > offset)
-                        length = lastSpace - offset;
-                }
-
-                yield return text.Substring(offset, length).Trim();
-                offset += length;
-            }
-        }
-
-        /// <summary>
-        /// Helper to simplify entity labels by removing "B-" and "I-" prefixes.
-        /// </summary>
-        private string SimplifyEntityLabel(string label)
-        {
-            if (label.StartsWith("B-") || label.StartsWith("I-"))
-                return label.Substring(2);
-            return label;
-        }
-
-        /// <summary>
-        /// Cleans and normalizes a list of skill strings by removing banned words,
-        /// formatting casing to title case, and eliminating duplicates.
-        /// </summary>
-        /// <param name="skills">List of raw skill strings</param>
-        /// <returns>Cleaned list of formatted skill names</returns>
-        private List<string> CleanSkillList(List<string> skills)
-        {
-            var banned = new[] { "team", "work", "project", "experience", "management" };
-            return skills
-                .Where(skill => skill.Length > 2 && !banned.Contains(skill.ToLower()))
-                .Select(skill => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(skill.ToLower()))
-                .Distinct()
-                .ToList();
-        }
-
-        /// <summary>
-        /// Cleans a word by removing unwanted characters and token artifacts like "##".
-        /// Also strips symbols and punctuation not part of common skill names.
-        /// </summary>
-        /// <param name="word">The raw word token</param>
-        /// <returns>Cleaned version of the word</returns>
-        private string CleanWord(string word)
-        {
-            var cleaned = word.Trim().Replace("##", "").Replace(".", "");
-            return Regex.Replace(cleaned, @"[^a-zA-Z0-9\-\+\.#]", ""); // strip weird symbols
-        }
-
-        /// <summary>
-        /// Helper to map raw entity labels to friendly category names.
-        /// Add or update mappings according to model's entity labels.
-        /// </summary>
-        private string MapToCategory(string entityLabel)
-        {
-            return entityLabel.ToUpper() switch
-            {
-                "PER" or "PERSON" => "Persons",
-                "ORG" or "ORGANIZATION" => "Organizations",
-                "LOC" or "LOCATION" => "Locations",
-                "MISC" => "Skills",
-                "SKILL" or "SKILLS" or "TECH" or "TECHNOLOGY" => "Skills",
-                "JOB" or "ROLE" or "TITLE" or "POSITION" or "OCCUPATION" or "WORK_EXP" or "WORK_EXPERIENCE" => "WorkExperience",
-                "EDU" or "EDUCATION" or "SCHOOL" or "DEGREE" => "Education",
-                _ => "Other"
-            };
         }
     }
 
