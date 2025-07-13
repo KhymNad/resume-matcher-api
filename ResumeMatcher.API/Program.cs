@@ -3,9 +3,13 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ResumeMatcherAPI.Services;
+using ResumeMatcherAPI.Helpers;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
+using Npgsql;
+using Pgvector;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,7 +26,6 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<SkillService>();
 
-
 // Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -33,11 +36,17 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins(
-                "http://localhost:3000") // TODO: add vercel domain for frontend 
+                "http://localhost:3000") // TODO: Add your Vercel domain
                 .AllowAnyHeader()
                 .AllowAnyMethod();
     });
 });
+
+// Configure EmbeddingHelper with Hugging Face settings
+EmbeddingHelper.Configure(builder.Configuration);
+
+
+NpgsqlConnection.GlobalTypeMapper.UseVector();
 
 // Build the app
 var app = builder.Build();

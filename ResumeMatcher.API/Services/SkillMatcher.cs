@@ -1,77 +1,225 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Npgsql;
+using System.Text;
+using System.Text.Json;
+using System.Text.Encodings.Web;
 
 namespace ResumeMatcherAPI.Helpers
 {
-    /// <summary>
-    /// Provides functionality to load known skills from the database 
-    /// and match those skills against input text.
-    /// </summary>
+    public class MatchedSkill
+    {
+        public string Skill { get; set; }
+        public string Source { get; set; }  // "NER", "substring", "ngram", "embedding"
+        public double? Score { get; set; }  // Optional: confidence from embeddings
+    }
+
     public static class SkillMatcher
     {
-        // Holds the set of known skills loaded from the database, stored in lowercase for case-insensitive matching.
-        private static HashSet<string>? _knownSkills;
+        private static HashSet<string>? _knownSkills; // Normalized
+        private static Dictionary<string, string>? _normalizedSkillMap; // Normalized -> Original
+        private static Dictionary<string, List<float>> _skillEmbeddings = new(); // Normalized -> Embedding vector
 
-        /// <summary>
-        /// Loads known skills from the 'skills' table in the database.
-        /// Each skill name is converted to lowercase and trimmed for consistent matching.
-        /// </summary>
-        /// <param name="connectionString">Connection string to the PostgreSQL database.</param>
-        public static void LoadSkillsFromDb(string connectionString)
+        public static HashSet<string> GetLoadedSkills()
         {
-            var skills = new HashSet<string>();
+            return _knownSkills ?? new HashSet<string>();
+        }
 
-            // Establish a connection to the PostgreSQL database using Npgsql
-            using var conn = new NpgsqlConnection(connectionString);
-            conn.Open();
-
-            // Prepare and execute a SQL command to select skill names
-            using var cmd = new NpgsqlCommand("SELECT name FROM skills", conn);
-            using var reader = cmd.ExecuteReader();
-
-            // Read each skill name from the result set
-            while (reader.Read())
-            {
-                // Get the skill name as a string, trim whitespace, and convert to lowercase
-                var skill = reader.GetString(0).Trim().ToLowerInvariant();
-
-                // Add the skill to the hash set if it's not empty
-                if (!string.IsNullOrEmpty(skill))
-                {
-                    skills.Add(skill);
-                }
-            }
-
-            // Cache the loaded skills in the static field for future matching
-            _knownSkills = skills;
+        public static Dictionary<string, string> GetNormalizedSkillMap()
+        {
+            return _normalizedSkillMap ?? new Dictionary<string, string>();
         }
 
         /// <summary>
-        /// Matches known skills against the provided text.
-        /// Returns a list of skills found within the text.
+        /// Normalize a skill by lowercasing, trimming, and removing non-alphanumeric characters.
         /// </summary>
-        /// <param name="text">Input text to search for skills.</param>
-        /// <returns>List of matched skills in Title Case format.</returns>
-        public static List<string> MatchKnownSkills(string text)
+        private static string NormalizeSkill(string skill)
         {
-            // If the known skills have not been loaded yet, return an empty list
-            if (_knownSkills == null) return new List<string>();
+            string normalized = skill.ToLowerInvariant().Trim();
+            // Allow + and # for C++, C#, etc.
+            normalized = Regex.Replace(normalized, @"[^a-z0-9\s+#]", "");
+            normalized = Regex.Replace(normalized, @"\s+", " ");
+            return normalized;
+        }
 
-            var found = new List<string>();
-            var lowerText = text.ToLowerInvariant();
+        /// <summary>
+        /// Load skills and embeddings from the Supabase DB.
+        /// </summary>
+        public static void LoadSkillsFromDb(string connectionString)
+        {
+            var skills = new HashSet<string>();
+            var normalizedMap = new Dictionary<string, string>();
+            var embeddings = new Dictionary<string, List<float>>();
 
-            // Check if each known skill appears anywhere in the input text (case-insensitive)
-            foreach (var skill in _knownSkills)
+            using var conn = new NpgsqlConnection(connectionString);
+            conn.Open();
+
+            using var cmd = new NpgsqlCommand("SELECT name, embedding_array FROM skills", conn);
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
             {
-                if (lowerText.Contains(skill))
+                var originalSkill = reader.GetString(0).Trim();
+                var normalizedSkill = NormalizeSkill(originalSkill);
+
+                if (!string.IsNullOrWhiteSpace(normalizedSkill))
                 {
-                    // Convert the skill to Title Case for display (e.g., "csharp" -> "Csharp")
-                    found.Add(CultureInfo.CurrentCulture.TextInfo.ToTitleCase(skill));
+                    skills.Add(normalizedSkill);
+                    normalizedMap[normalizedSkill] = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(originalSkill.ToLower());
+
+                    if (!reader.IsDBNull(1))
+                    {
+                        // Read the vector as float[] directly (requires pgvector .NET support)
+                        var embeddingVector = reader.GetFieldValue<float[]>(1);
+                        if (embeddingVector != null && embeddingVector.Length > 0)
+                        {
+                            embeddings[normalizedSkill] = embeddingVector.ToList();
+                        }
+                    }
                 }
             }
 
-            // Return distinct skills to avoid duplicates
-            return found.Distinct().ToList();
+            _knownSkills = skills;
+            _normalizedSkillMap = normalizedMap;
+            _skillEmbeddings = embeddings;
+        }
+
+        public static List<string> MatchKnownSkills(string text)
+        {
+            if (_knownSkills == null || _normalizedSkillMap == null)
+                return new List<string>();
+
+            string cleanedText = NormalizeSkill(text);
+            var found = new HashSet<string>();
+
+            foreach (var normalizedSkill in _knownSkills)
+            {
+                if (cleanedText.Contains(normalizedSkill))
+                {
+                    found.Add(_normalizedSkillMap[normalizedSkill]);
+                }
+            }
+
+            return found.OrderBy(x => x).ToList();
+        }
+
+        public static List<string> MatchSkillsWithNGrams(string text, int maxGramSize = 5)
+        {
+            if (_knownSkills == null || _normalizedSkillMap == null)
+                return new List<string>();
+
+            var tokens = NormalizeSkill(text).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var found = new HashSet<string>();
+
+            for (int n = 1; n <= maxGramSize; n++)
+            {
+                for (int i = 0; i <= tokens.Length - n; i++)
+                {
+                    var ngram = string.Join(" ", tokens.Skip(i).Take(n));
+                    if (_knownSkills.Contains(ngram))
+                    {
+                        found.Add(_normalizedSkillMap[ngram]);
+                    }
+                }
+            }
+
+            return found.OrderBy(x => x).ToList();
+        }
+
+        public static List<string> MatchSkillsSmart(string text)
+        {
+            var set = new HashSet<string>();
+            set.UnionWith(MatchKnownSkills(text));
+            set.UnionWith(MatchSkillsWithNGrams(text));
+            return set.OrderBy(x => x).ToList();
+        }
+
+        /// <summary>
+        /// Computes cosine similarity between two float vectors.
+        /// </summary>
+        private static double CosineSimilarity(List<float> a, List<float> b)
+        {
+            if (a.Count != b.Count) return 0;
+
+            double dot = 0, magA = 0, magB = 0;
+            for (int i = 0; i < a.Count; i++)
+            {
+                dot += a[i] * b[i];
+                magA += a[i] * a[i];
+                magB += b[i] * b[i];
+            }
+
+            return (magA == 0 || magB == 0) ? 0 : dot / (Math.Sqrt(magA) * Math.Sqrt(magB));
+        }
+
+        /// <summary>
+        /// Matches skills using NER input, substring/n-gram detection, and embeddings.
+        /// </summary>
+        public static List<MatchedSkill> MatchSkills(string resumeText, List<string> nerSkills = null, float embeddingThreshold = 0.75f)
+        {
+            var matched = new List<MatchedSkill>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            nerSkills ??= new List<string>();
+
+            // 1. Add NER-tagged skills
+            foreach (var skill in nerSkills)
+            {
+                var cleaned = skill.Trim();
+                if (!string.IsNullOrWhiteSpace(cleaned) && seen.Add(cleaned))
+                {
+                    matched.Add(new MatchedSkill
+                    {
+                        Skill = cleaned,
+                        Source = "NER"
+                    });
+                }
+            }
+
+            // 2. Substring + N-gram matches
+            var smartMatches = MatchSkillsSmart(resumeText);
+            foreach (var skill in smartMatches)
+            {
+                if (seen.Add(skill))
+                {
+                    matched.Add(new MatchedSkill
+                    {
+                        Skill = skill,
+                        Source = "ngram"
+                    });
+                }
+            }
+
+            // 3. Embedding match (if we have known skill vectors)
+            var resumeEmbedding = EmbeddingHelper.GetEmbedding(resumeText);
+            if (resumeEmbedding != null)
+            {
+                foreach (var kvp in _skillEmbeddings)
+                {
+                    string normalizedSkill = kvp.Key;
+                    List<float> skillEmbedding = kvp.Value;
+
+                    double similarity = CosineSimilarity(resumeEmbedding, skillEmbedding);
+                    if (similarity >= embeddingThreshold)
+                    {
+                        var originalSkill = _normalizedSkillMap.ContainsKey(normalizedSkill)
+                            ? _normalizedSkillMap[normalizedSkill]
+                            : normalizedSkill;
+
+                        if (seen.Add(originalSkill))
+                        {
+                            matched.Add(new MatchedSkill
+                            {
+                                Skill = originalSkill,
+                                Source = "embedding",
+                                Score = similarity
+                            });
+                        }
+                    }
+                }
+            }
+
+            return matched.OrderByDescending(m => m.Score ?? 1.0).ToList();
         }
     }
 }

@@ -115,7 +115,6 @@ namespace ResumeMatcherAPI.Controllers
             string resumeText = await _extractor.ExtractTextAsync(file);
 
             // SkillMatcher.LoadSkills("Data/skills.txt");
-            var knownSkills = await _skillService.GetAllSkillsAsync();
             SkillMatcher.LoadSkillsFromDb(_dbConnectionString);
 
             // List to collect entities from all chunks
@@ -193,7 +192,7 @@ namespace ResumeMatcherAPI.Controllers
 
             // Group entities by simplified category labels and filter by confidence threshold
             var groupedEntities = mergedEntities
-                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.90f)
+                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.96f)
                 .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity ?? string.Empty)))
                 .ToDictionary(
                     g => g.Key,
@@ -222,27 +221,37 @@ namespace ResumeMatcherAPI.Controllers
                     groupedEntities["Education"] = educationFallback;
             }
 
-            // Match known skills directly from resume text
-            var matchedSkills = SkillMatcher.MatchKnownSkills(resumeText);
+            // Collect NER-labeled skills (entity = "Skills" category)
+            var nerSkills = groupedEntities.ContainsKey("Skills") ? groupedEntities["Skills"] : new List<string>();
 
-            if (!groupedEntities.ContainsKey("Skills"))
-                groupedEntities["Skills"] = matchedSkills;
-            else
-                groupedEntities["Skills"].AddRange(matchedSkills.Except(groupedEntities["Skills"]));
+            // Perform full skill matching (NER + substring + embedding)
+            var matchedSkillObjs = SkillMatcher.MatchSkills(resumeText, nerSkills);
 
-            // Extract bullet points and match for additional skill hints
-            var bulletPoints = ExtractBulletPoints(resumeText);
-            var bulletSkills = bulletPoints.SelectMany(SkillMatcher.MatchKnownSkills).Distinct().ToList();
+            // Replace "Skills" in groupedEntities with cleaned list
+            groupedEntities["Skills"] = matchedSkillObjs
+                .Select(s => s.Skill)
+                .Distinct()
+                .OrderBy(s => s)
+                .ToList();
 
-            groupedEntities["Skills"].AddRange(bulletSkills.Except(groupedEntities["Skills"]));
-
+            // include full skill object with source info in response
+            var detailedSkills = matchedSkillObjs
+                .OrderByDescending(s => s.Score ?? 1) // prefer scored matches first
+                .Select(s => new
+                {
+                    s.Skill,
+                    s.Source,
+                    Score = s.Score?.ToString("0.00") ?? null
+                });
 
             // Return the extracted text and grouped entities
             return Ok(new
             {
                 fileName = file.FileName,
                 extractedText = resumeText,
-                groupedEntities
+                mergedEntities = mergedEntities,
+                groupedEntities,
+                detailedSkills
             });
         }
 
@@ -296,21 +305,6 @@ namespace ResumeMatcherAPI.Controllers
                 .Where(skill => skill.Length > 2 && !banned.Contains(skill.ToLower()))
                 .Select(skill => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(skill.ToLower()))
                 .Distinct()
-                .ToList();
-        }
-
-        /// <summary>
-        /// Extracts bullet-pointed lines from the resume text for further processing.
-        /// Supports common bullet styles like •, *, -, and Unicode bullets.
-        /// </summary>
-        /// <param name="text">The raw resume text</param>
-        /// <returns>List of bullet point lines</returns>
-        private List<string> ExtractBulletPoints(string text)
-        {
-            var bulletRegex = new Regex(@"(?:•|\*|\-|\u2022)\s+(.*)", RegexOptions.Multiline);
-            return bulletRegex.Matches(text)
-                .Select(m => m.Groups[1].Value.Trim())
-                .Where(b => b.Length > 2)
                 .ToList();
         }
 
