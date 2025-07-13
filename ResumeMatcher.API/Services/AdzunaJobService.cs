@@ -20,7 +20,7 @@ namespace ResumeMatcherAPI.Services
 
         // Searches Adzuna jobs for multiple skills and locations
         // Aggregates unique jobs based on RedirectUrl to avoid duplicates
-        public async Task<List<JobListing>> SearchJobsAsync(List<string> skills, List<string> locations)
+        public async Task<List<JobListing>> SearchJobsAsync(List<string> skills, List<string> locations, string? countryOverride = null)
         {
             // Read Adzuna API credentials from configuration
             string appId = _config["Adzuna:AppId"]!;
@@ -55,7 +55,10 @@ namespace ResumeMatcherAPI.Services
                     string where = Uri.EscapeDataString(loc);
 
                     // Build the Adzuna API search URL with parameters
-                    string url = $"https://api.adzuna.com/v1/api/jobs/ca/search/1?app_id={appId}&app_key={appKey}&results_per_page=10&what={what}&where={where}";
+                    string country = !string.IsNullOrWhiteSpace(countryOverride) ? countryOverride.ToLower() : "us";
+
+                    string url = $"https://api.adzuna.com/v1/api/jobs/{country}/search/1" +
+                    $"?app_id={appId}&app_key={appKey}&results_per_page=10&what={what}&where={where}";
 
                     Console.WriteLine($"Querying: {url}");  // Debug output for tracking queries
 

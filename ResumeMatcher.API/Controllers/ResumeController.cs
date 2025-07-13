@@ -17,7 +17,7 @@ namespace ResumeMatcherAPI.Controllers
         private readonly FileTextExtractor _extractor;        // Service to extract text from resume files
         private readonly AdzunaJobService _adzunaJobService; // Service to get job postings
 
-        private readonly SkillService _skillService; // Service to get Skills from Supabase DB
+        //private readonly SkillService _skillService; // Service to get Skills from Supabase DB
 
         private readonly string _dbConnectionString;
 
@@ -27,7 +27,7 @@ namespace ResumeMatcherAPI.Controllers
             _huggingFace = huggingFace;
             _extractor = extractor;
             _adzunaJobService = adzunaJobService;
-            _skillService = skillService;
+            //_skillService = skillService;
             _dbConnectionString = configuration.GetConnectionString("Supabase") ?? throw new InvalidOperationException("Supabase connection string is missing.");
 
             // Load skills once on controller startup
@@ -68,7 +68,7 @@ namespace ResumeMatcherAPI.Controllers
         /// Uploads a resume, extracts structured data, and fetches relevant job postings.
         /// </summary>
         [HttpPost("upload-with-jobs")]
-        public async Task<IActionResult> UploadResumeWithJobs(IFormFile file)
+        public async Task<IActionResult> UploadResumeWithJobs(IFormFile file, [FromQuery] string? countryCode = null)
         {
             var uploadResult = await UploadResume(file) as OkObjectResult;
 
@@ -81,15 +81,13 @@ namespace ResumeMatcherAPI.Controllers
             if (parsedResult == null || groupedEntities == null)
                 return BadRequest("Unable to extract structured data from resume.");
 
-            // Extract skills and locations
             var skills = groupedEntities.TryGetValue("Skills", out var skillsList) ? skillsList : new List<string>();
             var locations = groupedEntities.TryGetValue("Locations", out var locationList) ? locationList : new List<string>();
 
-            // Use most specific location for display purposes, if needed
             var displayLocation = locations.LastOrDefault() ?? "Canada";
 
-            // Fetch jobs from Adzuna using skills and locations
-            var jobResults = await _adzunaJobService.SearchJobsAsync(skills, locations);
+            // Pass the countryCode (can be null) to the service
+            var jobResults = await _adzunaJobService.SearchJobsAsync(skills, locations, countryCode);
 
             return Ok(new
             {
@@ -98,6 +96,7 @@ namespace ResumeMatcherAPI.Controllers
                 jobResults
             });
         }
+
 
         /// <summary>
         /// POST /api/resume/upload
@@ -143,7 +142,7 @@ namespace ResumeMatcherAPI.Controllers
                 .Select(s => s.Skill)
                 .Distinct()
                 .OrderBy(s => s)
-                .ToList();
+                .ToList()!;
 
             var detailedSkills = matchedSkillObjs
                 .Select(s => new
