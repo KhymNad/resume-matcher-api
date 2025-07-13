@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: resume-matcher-api
+    runtime: dotnet
+    repo: https://github.com/KhymNad/resume-matcher-api
+    branch: main
+    buildCommand: dotnet build
+    startCommand: dotnet ResumeMatcher.API.dll
+    rootDir: ResumeMatcher.API
+    plan: free
