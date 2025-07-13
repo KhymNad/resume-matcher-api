@@ -9,16 +9,15 @@ namespace ResumeMatcherAPI.Helpers
 {
     public class MatchedSkill
     {
-        public string Skill { get; set; }
-        public string Source { get; set; }  // "NER", "substring", "ngram", "embedding"
-        public double? Score { get; set; }  // Optional: confidence from embeddings
+        public string? Skill { get; set; }
+        public string? Source { get; set; }  // "NER", "substring", "ngram"
+        public double? Score { get; set; }  // Removed embedding, keep nullable for flexibility
     }
 
     public static class SkillMatcher
     {
         private static HashSet<string>? _knownSkills; // Normalized
         private static Dictionary<string, string>? _normalizedSkillMap; // Normalized -> Original
-        private static Dictionary<string, List<float>> _skillEmbeddings = new(); // Normalized -> Embedding vector
 
         public static HashSet<string> GetLoadedSkills()
         {
@@ -31,30 +30,49 @@ namespace ResumeMatcherAPI.Helpers
         }
 
         /// <summary>
-        /// Normalize a skill by lowercasing, trimming, and removing non-alphanumeric characters.
+        /// Generalized skill validity check.
+        /// Accepts skills longer than 2 chars, or short skills only if uppercase or contain # or +.
+        /// </summary>
+        private static bool IsValidSkill(string skill)
+        {
+            if (string.IsNullOrWhiteSpace(skill))
+                return false;
+
+            skill = skill.Trim();
+
+            if (skill.Length > 2)
+                return true;
+
+            // For short skills (1-2 chars), require uppercase letter or '#' or '+'
+            if (skill.Any(char.IsUpper) || skill.Contains('#') || skill.Contains('+'))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Normalize a skill by lowercasing, trimming, and removing non-alphanumeric characters except + and #.
         /// </summary>
         private static string NormalizeSkill(string skill)
         {
             string normalized = skill.ToLowerInvariant().Trim();
-            // Allow + and # for C++, C#, etc.
             normalized = Regex.Replace(normalized, @"[^a-z0-9\s+#]", "");
             normalized = Regex.Replace(normalized, @"\s+", " ");
             return normalized;
         }
 
         /// <summary>
-        /// Load skills and embeddings from the Supabase DB.
+        /// Load skills from the Supabase DB.
         /// </summary>
         public static void LoadSkillsFromDb(string connectionString)
         {
             var skills = new HashSet<string>();
             var normalizedMap = new Dictionary<string, string>();
-            var embeddings = new Dictionary<string, List<float>>();
 
             using var conn = new NpgsqlConnection(connectionString);
             conn.Open();
 
-            using var cmd = new NpgsqlCommand("SELECT name, embedding_array FROM skills", conn);
+            using var cmd = new NpgsqlCommand("SELECT name FROM skills", conn);
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
@@ -66,22 +84,11 @@ namespace ResumeMatcherAPI.Helpers
                 {
                     skills.Add(normalizedSkill);
                     normalizedMap[normalizedSkill] = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(originalSkill.ToLower());
-
-                    if (!reader.IsDBNull(1))
-                    {
-                        // Read the vector as float[] directly (requires pgvector .NET support)
-                        var embeddingVector = reader.GetFieldValue<float[]>(1);
-                        if (embeddingVector != null && embeddingVector.Length > 0)
-                        {
-                            embeddings[normalizedSkill] = embeddingVector.ToList();
-                        }
-                    }
                 }
             }
 
             _knownSkills = skills;
             _normalizedSkillMap = normalizedMap;
-            _skillEmbeddings = embeddings;
         }
 
         public static List<string> MatchKnownSkills(string text)
@@ -94,10 +101,10 @@ namespace ResumeMatcherAPI.Helpers
 
             foreach (var normalizedSkill in _knownSkills)
             {
-                if (cleanedText.Contains(normalizedSkill))
-                {
-                    found.Add(_normalizedSkillMap[normalizedSkill]);
-                }
+                if (cleanedText.Contains(normalizedSkill) && IsValidSkill(normalizedSkill))
+                    {
+                        found.Add(_normalizedSkillMap[normalizedSkill]);
+                    }
             }
 
             return found.OrderBy(x => x).ToList();
@@ -135,27 +142,9 @@ namespace ResumeMatcherAPI.Helpers
         }
 
         /// <summary>
-        /// Computes cosine similarity between two float vectors.
+        /// Matches skills using NER input, substring/n-gram detection.
         /// </summary>
-        private static double CosineSimilarity(List<float> a, List<float> b)
-        {
-            if (a.Count != b.Count) return 0;
-
-            double dot = 0, magA = 0, magB = 0;
-            for (int i = 0; i < a.Count; i++)
-            {
-                dot += a[i] * b[i];
-                magA += a[i] * a[i];
-                magB += b[i] * b[i];
-            }
-
-            return (magA == 0 || magB == 0) ? 0 : dot / (Math.Sqrt(magA) * Math.Sqrt(magB));
-        }
-
-        /// <summary>
-        /// Matches skills using NER input, substring/n-gram detection, and embeddings.
-        /// </summary>
-        public static List<MatchedSkill> MatchSkills(string resumeText, List<string> nerSkills = null, float embeddingThreshold = 0.75f)
+        public static List<MatchedSkill> MatchSkills(string resumeText, List<string> nerSkills = null)
         {
             var matched = new List<MatchedSkill>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -190,36 +179,7 @@ namespace ResumeMatcherAPI.Helpers
                 }
             }
 
-            // 3. Embedding match (if we have known skill vectors)
-            var resumeEmbedding = EmbeddingHelper.GetEmbedding(resumeText);
-            if (resumeEmbedding != null)
-            {
-                foreach (var kvp in _skillEmbeddings)
-                {
-                    string normalizedSkill = kvp.Key;
-                    List<float> skillEmbedding = kvp.Value;
-
-                    double similarity = CosineSimilarity(resumeEmbedding, skillEmbedding);
-                    if (similarity >= embeddingThreshold)
-                    {
-                        var originalSkill = _normalizedSkillMap.ContainsKey(normalizedSkill)
-                            ? _normalizedSkillMap[normalizedSkill]
-                            : normalizedSkill;
-
-                        if (seen.Add(originalSkill))
-                        {
-                            matched.Add(new MatchedSkill
-                            {
-                                Skill = originalSkill,
-                                Source = "embedding",
-                                Score = similarity
-                            });
-                        }
-                    }
-                }
-            }
-
-            return matched.OrderByDescending(m => m.Score ?? 1.0).ToList();
+            return matched.OrderBy(m => m.Skill).ToList();
         }
     }
 }
