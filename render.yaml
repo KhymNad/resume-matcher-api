@@ -6,6 +6,7 @@ services:
     branch: main
     buildCommand: dotnet build
     startCommand: dotnet ResumeMatcherAPI.dll
+    rootDir: ResumeMatcher.API
     envVars:
       - key: SUPABASE_URL
         sync: false
