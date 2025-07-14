@@ -16,16 +16,18 @@ namespace ResumeMatcherAPI.Controllers
         private readonly HuggingFaceNlpService _huggingFace; // Service to call Hugging Face API
         private readonly FileTextExtractor _extractor;        // Service to extract text from resume files
         private readonly AdzunaJobService _adzunaJobService; // Service to get job postings
+        private readonly PythonResumeParserService _pythonParser; // Service to parse uploaded resume
 
         //private readonly SkillService _skillService; // Service to get Skills from Supabase DB
         //private readonly string _dbConnectionString;
 
         // Constructor injects all required services
-        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, AdzunaJobService adzunaJobService, SkillService skillService, IConfiguration configuration)
+        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, AdzunaJobService adzunaJobService, SkillService skillService, IConfiguration configuration, PythonResumeParserService pythonParser)
         {
             _huggingFace = huggingFace;
             _extractor = extractor;
             _adzunaJobService = adzunaJobService;
+            _pythonParser = pythonParser;
             //_skillService = skillService;
             //_dbConnectionString = configuration.GetConnectionString("Supabase") ?? throw new InvalidOperationException("Supabase connection string is missing.");
 
@@ -107,8 +109,14 @@ namespace ResumeMatcherAPI.Controllers
             if (file == null || file.Length == 0)   // Validate that a file was uploaded
                 return BadRequest("No file uploaded.");
 
-            string resumeText = await _extractor.ExtractTextAsync(file);    // Extract plain text from the uploaded resume file
+            //string resumeText = await _extractor.ExtractTextAsync(file);    // Extract plain text from the uploaded resume file
             // SkillMatcher.LoadSkillsFromDb(_dbConnectionString);  // Load skills from the database for skill matching
+
+            var parsedJson = await _pythonParser.ExtractTextAsync(file);
+            dynamic? parsed = JsonConvert.DeserializeObject(parsedJson);
+            string? resumeText = parsed.cleaned_text;
+            if (string.IsNullOrWhiteSpace(resumeText))
+                return BadRequest("Resume text is missing or empty.");
 
             var allEntities = new List<HuggingFaceEntity>();
             var chunks = ResumeControllerHelpers.SplitTextIntoChunks(resumeText, 1000); // Split resume text into manageable chunks to avoid exceeding API limits

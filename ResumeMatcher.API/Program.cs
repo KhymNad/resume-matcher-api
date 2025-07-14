@@ -26,6 +26,7 @@ builder.Services.AddSingleton<AdzunaJobService>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<SkillService>();
+builder.Services.AddHttpClient<PythonResumeParserService>();
 
 // Swagger for API documentation
 builder.Services.AddEndpointsApiExplorer();
