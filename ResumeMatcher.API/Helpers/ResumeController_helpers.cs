@@ -83,10 +83,10 @@ namespace ResumeMatcherAPI.Helpers
             return entityLabel.ToUpper() switch
             {
                 "PER" or "PERSON" => "Persons",
-                "ORG" or "ORGANIZATION" => "Organizations",
+                // "ORG" or "ORGANIZATION" => "Organizations",
                 "LOC" or "LOCATION" => "Locations",
                 "MISC" => "Skills",
-                "SKILL" or "SKILLS" or "TECH" or "TECHNOLOGY" => "Skills",
+                "ORG" or "ORGANIZATION" or "SKILL" or "SKILLS" or "TECH" or "TECHNOLOGY" => "Skills",
                 "JOB" or "ROLE" or "TITLE" or "POSITION" or "OCCUPATION" or "WORK_EXP" or "WORK_EXPERIENCE" => "WorkExperience",
                 "EDU" or "EDUCATION" or "SCHOOL" or "DEGREE" => "Education",
                 _ => "Other"
@@ -161,7 +161,7 @@ namespace ResumeMatcherAPI.Helpers
         public static Dictionary<string, List<string>> GroupAndCleanEntities(List<HuggingFaceEntity> mergedEntities)
         {
             var groupedEntities = mergedEntities
-                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.96f)
+                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.80f)
                 .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity ?? string.Empty)))
                 .ToDictionary(
                     g => g.Key,
