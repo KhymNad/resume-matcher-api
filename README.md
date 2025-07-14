@@ -17,24 +17,51 @@
 ---
 
 ## 📁 Project Structure
-ResumeMatcherAPI/
+ResumeMatcher.API/
+
 ├── Controllers/
+
 │ └── ResumeController.cs
+
+│ └── SupabaseController.cs
+
 ├── Services/
-│ ├── HuggingFaceNlpService.cs
+
 │ ├── AdzunaJobService.cs
-│ └── SkillService.cs
+
+│ ├── ApplicationDBContext.cs
+
+│ ├── FileTextExtractor.cs
+
+│ └── HuggingFaceNlpService.cs
+
+│ ├── PythonResumeParserService.cs
+
+│ └── SkillMatcher.cs
+
 ├── Helpers/
+
 │ └── ResumeControllerHelpers.cs
+
 ├── Python/
+
 │ ├── resume_parser.py # Flask microservice
+
 │ ├── requirements.txt
+
 │ └── Dockerfile # For Render deployment
-├── Models/
-│ └── [Entity models...]
+
 ├── appsettings.json
+
 ├── Program.cs
-└── ResumeMatcherAPI.csproj
+
+├── .env
+
+└── ResumeMatcher.API.csproj
+
+.render.yaml
+
+Dockerfile
 
 ---
 
@@ -85,9 +112,13 @@ dotnet run
 
 ## 📡 API Endpoints
 Method	Endpoint	Description
+
 GET	/api/resume/health	Health check
+
 GET	/api/resume/test-huggingface	Sends sample text to Hugging Face NER
+
 POST	/api/resume/upload	Upload resume, extract + group entities
+
 POST	/api/resume/upload-with-jobs	Upload resume + return job matches (Adzuna)
 
 ## 📦 Dependencies
