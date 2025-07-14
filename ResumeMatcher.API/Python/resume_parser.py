@@ -43,5 +43,9 @@ def extract_resume():
     cleaned_text = clean_text(text)
     return jsonify({"cleaned_text": cleaned_text})
 
+@app.route("/healthz")
+def health():
+    return "OK", 200
+
 if __name__ == "__main__":
     app.run(port=5001)
