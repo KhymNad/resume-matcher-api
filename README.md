@@ -79,11 +79,13 @@ Dockerfile
 
 Create a `.env` file at the root of the .NET project or use Render’s Secret Environment system:
 
+```bash
 HUGGINGFACE_API_KEY=your_huggingface_token
 ADZUNA_APP_ID=your_adzuna_app_id
 ADZUNA_APP_KEY=your_adzuna_app_key
 PYTHON_PARSER_URL=http://localhost:5001 # Or https://<render-url> if deployed
 SUPABASE_CONNECTION_STRING=postgresql://user:password@host:port/database
+```
 
 ---
 
