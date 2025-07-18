@@ -38,7 +38,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins(
-                "http://localhost:3000") // TODO: Add your Vercel domain
+            "http://localhost:3000",     // React dev server (Vite uses 5173)
+            "http://localhost:5173",     // Vite
+            "https://resumematcher.vercel.app" // Vercel 
+        )
                 .AllowAnyHeader()
                 .AllowAnyMethod();
     });
