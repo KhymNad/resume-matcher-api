@@ -13,11 +13,7 @@ public class PythonResumeParserService
 
     public async Task<string> ExtractTextAsync(IFormFile file)
     {
-        // Ping the service first to wake it up
-        await PingMicroserviceAsync();
-
-        // Wait briefly to allow cold start to finish
-        await Task.Delay(2000);
+        await WaitForServiceReadyAsync();
 
         using var content = new MultipartFormDataContent();
         using var fileStream = file.OpenReadStream();
@@ -32,19 +28,30 @@ public class PythonResumeParserService
         return result;
     }
 
-    private async Task PingMicroserviceAsync()
+    private async Task WaitForServiceReadyAsync(int maxAttempts = 5, int delayMs = 1500)
     {
-        try
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var response = await _httpClient.GetAsync("/healthz");
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                Console.WriteLine($"[Ping] Microservice unhealthy: {response.StatusCode}");
+                var response = await _httpClient.GetAsync("/healthz");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[Ping] Microservice ready (attempt {attempt})");
+                    return;
+                }
+
+                Console.WriteLine($"[Ping] Not ready: {response.StatusCode} (attempt {attempt})");
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Ping] Error contacting microservice: {ex.Message} (attempt {attempt})");
+            }
+
+            await Task.Delay(delayMs);
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Ping] Microservice unreachable: {ex.Message}");
-        }
+
+        throw new Exception("Microservice did not become ready after multiple attempts.");
     }
 }
