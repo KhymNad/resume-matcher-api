@@ -10,38 +10,25 @@ namespace ResumeMatcherAPI.Services
 {
     public class FileTextExtractor
     {
-        private readonly string _pythonServiceBaseUrl = "http://localhost:5001";
+        private readonly string _pythonServiceBaseUrl = "https://resume-parser-oysv.onrender.com"; // <-- updated for production
 
         public async Task<string> ExtractTextAsync(IFormFile file)
         {
             var ext = Path.GetExtension(file.FileName).ToLower();
 
-            if (ext == ".pdf")
+            return ext switch
             {
-                return await ExtractTextViaPythonAsync(file);
-            }
-            else if (ext == ".docx")
-            {
-                using var stream = file.OpenReadStream();
-                return ExtractTextFromDocx(stream);
-            }
-            else if (ext == ".txt")
-            {
-                using var reader = new StreamReader(file.OpenReadStream());
-                return await reader.ReadToEndAsync();
-            }
-            else
-            {
-                throw new NotSupportedException("Unsupported file type.");
-            }
+                ".pdf" => await ExtractTextViaPythonAsync(file),
+                ".docx" => ExtractTextFromDocx(file.OpenReadStream()),
+                ".txt" => await ReadTextFileAsync(file),
+                _ => throw new NotSupportedException("Unsupported file type.")
+            };
         }
 
         private async Task<string> ExtractTextViaPythonAsync(IFormFile file)
         {
             using var httpClient = new HttpClient();
-
-            // Wait for the microservice to be ready (with retries)
-            await WaitForServiceReadyAsync(httpClient);
+            await WaitForServiceReadyAsync(httpClient); // improved retry logic
 
             using var content = new MultipartFormDataContent();
             using var stream = file.OpenReadStream();
@@ -55,8 +42,10 @@ namespace ResumeMatcherAPI.Services
             return doc.RootElement.GetProperty("cleaned_text").GetString() ?? string.Empty;
         }
 
-        private async Task WaitForServiceReadyAsync(HttpClient httpClient, int maxAttempts = 5, int delayMs = 1500)
+        private async Task WaitForServiceReadyAsync(HttpClient httpClient, int maxAttempts = 10, int baseDelayMs = 1000)
         {
+            var rand = new Random();
+
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 try
@@ -76,7 +65,10 @@ namespace ResumeMatcherAPI.Services
                     Console.WriteLine($"[Ping] Error: {ex.Message} (attempt {attempt})");
                 }
 
-                await Task.Delay(delayMs);
+                int delay = baseDelayMs * (int)Math.Pow(2, attempt); // exponential backoff
+                delay += rand.Next(0, 500); // add jitter
+                Console.WriteLine($"[Ping] Waiting {delay}ms before retry...");
+                await Task.Delay(delay);
             }
 
             throw new Exception("Microservice did not become ready after multiple attempts.");
@@ -89,6 +81,12 @@ namespace ResumeMatcherAPI.Services
             var document = mainPart?.Document;
             var body = document?.Body;
             return body?.InnerText ?? string.Empty;
+        }
+
+        private async Task<string> ReadTextFileAsync(IFormFile file)
+        {
+            using var reader = new StreamReader(file.OpenReadStream());
+            return await reader.ReadToEndAsync();
         }
     }
 }

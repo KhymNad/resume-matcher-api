@@ -1,4 +1,7 @@
+using System;
+using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
 public class PythonResumeParserService
@@ -13,7 +16,7 @@ public class PythonResumeParserService
 
     public async Task<string> ExtractTextAsync(IFormFile file)
     {
-        await WaitForServiceReadyAsync();
+        await WaitForServiceReadyAsync(_httpClient);
 
         using var content = new MultipartFormDataContent();
         using var fileStream = file.OpenReadStream();
@@ -24,17 +27,18 @@ public class PythonResumeParserService
         var response = await _httpClient.PostAsync("/extract-resume", content);
         response.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadAsStringAsync();
-        return result;
+        return await response.Content.ReadAsStringAsync();
     }
 
-    private async Task WaitForServiceReadyAsync(int maxAttempts = 5, int delayMs = 1500)
+    private async Task WaitForServiceReadyAsync(HttpClient httpClient, int maxAttempts = 10, int baseDelayMs = 1000)
     {
+        var rand = new Random();
+
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
             {
-                var response = await _httpClient.GetAsync("/healthz");
+                var response = await httpClient.GetAsync("/healthz");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -46,10 +50,14 @@ public class PythonResumeParserService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Ping] Error contacting microservice: {ex.Message} (attempt {attempt})");
+                Console.WriteLine($"[Ping] Error: {ex.Message} (attempt {attempt})");
             }
 
-            await Task.Delay(delayMs);
+            // Exponential backoff with jitter
+            var delay = baseDelayMs * (int)Math.Pow(2, attempt);
+            delay += rand.Next(0, 500); // Add jitter
+            Console.WriteLine($"[Ping] Waiting {delay}ms before retry...");
+            await Task.Delay(delay);
         }
 
         throw new Exception("Microservice did not become ready after multiple attempts.");
