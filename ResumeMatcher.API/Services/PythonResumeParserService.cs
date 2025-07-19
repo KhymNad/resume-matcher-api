@@ -13,6 +13,12 @@ public class PythonResumeParserService
 
     public async Task<string> ExtractTextAsync(IFormFile file)
     {
+        // Ping the service first to wake it up
+        await PingMicroserviceAsync();
+
+        // Wait briefly to allow cold start to finish
+        await Task.Delay(2000);
+
         using var content = new MultipartFormDataContent();
         using var fileStream = file.OpenReadStream();
         var fileContent = new StreamContent(fileStream);
@@ -24,5 +30,21 @@ public class PythonResumeParserService
 
         var result = await response.Content.ReadAsStringAsync();
         return result;
+    }
+
+    private async Task PingMicroserviceAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("/healthz");
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[Ping] Microservice unhealthy: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Ping] Microservice unreachable: {ex.Message}");
+        }
     }
 }
