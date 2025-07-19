@@ -40,11 +40,8 @@ namespace ResumeMatcherAPI.Services
         {
             using var httpClient = new HttpClient();
 
-            // Warm-up the microservice first
-            await PingMicroserviceAsync(httpClient);
-
-            // wait a bit to let the service spin up
-            await Task.Delay(2000); // 2 seconds
+            // Wait for the microservice to be ready (with retries)
+            await WaitForServiceReadyAsync(httpClient);
 
             using var content = new MultipartFormDataContent();
             using var stream = file.OpenReadStream();
@@ -58,20 +55,31 @@ namespace ResumeMatcherAPI.Services
             return doc.RootElement.GetProperty("cleaned_text").GetString() ?? string.Empty;
         }
 
-        private async Task PingMicroserviceAsync(HttpClient httpClient)
+        private async Task WaitForServiceReadyAsync(HttpClient httpClient, int maxAttempts = 5, int delayMs = 1500)
         {
-            try
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                var response = await httpClient.GetAsync($"{_pythonServiceBaseUrl}/healthz");
-                if (!response.IsSuccessStatusCode)
+                try
                 {
-                    Console.WriteLine($"[Ping] Microservice not healthy. Status code: {response.StatusCode}");
+                    var response = await httpClient.GetAsync($"{_pythonServiceBaseUrl}/healthz");
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"[Ping] Microservice ready (attempt {attempt})");
+                        return;
+                    }
+
+                    Console.WriteLine($"[Ping] Not ready: {response.StatusCode} (attempt {attempt})");
                 }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Ping] Error: {ex.Message} (attempt {attempt})");
+                }
+
+                await Task.Delay(delayMs);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Ping] Failed to contact microservice: {ex.Message}");
-            }
+
+            throw new Exception("Microservice did not become ready after multiple attempts.");
         }
 
         private string ExtractTextFromDocx(Stream stream)
