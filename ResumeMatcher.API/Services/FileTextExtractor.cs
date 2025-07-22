@@ -45,6 +45,7 @@ namespace ResumeMatcherAPI.Services
         private async Task WaitForServiceReadyAsync(HttpClient httpClient, int maxAttempts = 10, int baseDelayMs = 1000)
         {
             var rand = new Random();
+            Console.WriteLine("Pinging Python Microservice from ==========FileTextExtractor.cs==========");
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
