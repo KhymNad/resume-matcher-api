@@ -109,14 +109,35 @@ namespace ResumeMatcherAPI.Controllers
             if (file == null || file.Length == 0)   // Validate that a file was uploaded
                 return BadRequest("No file uploaded.");
 
+            // FOR RUNNING PYTHON MICROSERVICE LOCALLY TESTING ONLY - UNCOMMENT BELOW LINE
+            // ========================================
             //string resumeText = await _extractor.ExtractTextAsync(file);    // Extract plain text from the uploaded resume file
+            // ========================================
+
             // SkillMatcher.LoadSkillsFromDb(_dbConnectionString);  // Load skills from the database for skill matching
 
-            var parsedJson = await _pythonParser.ExtractTextAsync(file);
-            dynamic? parsed = JsonConvert.DeserializeObject(parsedJson);
-            string? resumeText = parsed.cleaned_text;
+            // FOR TESTING THE PYTHON MICROSERVICE THAT IS DEPLOYED BUT RUNNING .NET API LOCALLY
+            // ========================================
+            // var parsedJson = await _pythonParser.ExtractTextAsync(file);
+            // dynamic? parsed = JsonConvert.DeserializeObject(parsedJson);
+            // string? resumeText = parsed.cleaned_text;
+            // if (string.IsNullOrWhiteSpace(resumeText))
+            //     return BadRequest("Resume text is missing or empty.");
+            // ========================================
+
+            string resumeText;
+            try
+            {
+                resumeText = await _extractor.ExtractTextAsync(file);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error extracting text from resume: {ex.Message}");
+            }
+
             if (string.IsNullOrWhiteSpace(resumeText))
-                return BadRequest("Resume text is missing or empty.");
+                return BadRequest("Resume text is empty or unsupported format.");
+
 
             var allEntities = new List<HuggingFaceEntity>();
             var chunks = ResumeControllerHelpers.SplitTextIntoChunks(resumeText, 1000); // Split resume text into manageable chunks to avoid exceeding API limits
@@ -162,9 +183,9 @@ namespace ResumeMatcherAPI.Controllers
             {
                 fileName = file.FileName,
                 extractedText = resumeText,
-                mergedEntities = mergedEntities,
+                //mergedEntities = mergedEntities,
                 groupedEntities,
-                detailedSkills
+                //detailedSkills
             });
         }
     }
