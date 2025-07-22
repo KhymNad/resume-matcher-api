@@ -1,31 +1,32 @@
-# 1. Build your .NET app
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+# Stage 1: Build .NET 9 app
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /app
 
-# Copy everything and restore + publish
-COPY . .
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/publish
+# Copy csproj and restore dependencies
+COPY ResumeMatcher.API/*.csproj ./ResumeMatcher.API/
+RUN dotnet restore ResumeMatcher.API/ResumeMatcher.API.csproj
 
-# 2. Create the runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+# Copy everything else and build
+COPY ResumeMatcher.API/. ./ResumeMatcher.API/
+RUN dotnet publish ResumeMatcher.API/ResumeMatcher.API.csproj -c Release -o /app/out
+
+# Stage 2: Runtime image with Python
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 
 # Install Python 3 and pip
 RUN apt-get update && apt-get install -y python3 python3-pip
 
 # Copy published .NET app
-COPY --from=build /app/publish .
+COPY --from=build /app/out .
 
-# Copy your Python folder and requirements.txt
+# Copy Python scripts and requirements
 COPY ResumeMatcher.API/Python/ ./Python/
 
 # Install Python dependencies
 RUN pip3 install --upgrade pip
 RUN pip3 install -r Python/requirements.txt
 
-# Expose the port your .NET app listens on (default 80)
 EXPOSE 80
 
-# Start the .NET app
 ENTRYPOINT ["dotnet", "ResumeMatcher.API.dll"]
