@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y python3 python3-pip
 COPY --from=build /app/publish .
 
 # Copy your Python folder and requirements.txt
-COPY Python/ ./Python/
+COPY ResumeMatcher.API/Python/ ./Python/
 
 # Install Python dependencies
 RUN pip3 install --upgrade pip
