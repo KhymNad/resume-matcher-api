@@ -40,7 +40,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "http://localhost:3000",     // React dev server (Vite uses 5173)
             "http://localhost:5173",     // Vite
-            "https://resume-matcher-client.vercel.app/" // Vercel 
+            "https://resume-matcher-client.vercel.app" // Vercel 
         )
                 .AllowAnyHeader()
                 .AllowAnyMethod();
