@@ -89,7 +89,7 @@ namespace ResumeMatcherAPI.Services
             string scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "Python", "parse_resume_script.py");
             var startInfo = new ProcessStartInfo
             {
-                FileName = "python3",
+                FileName = "/opt/venv/bin/python",
                 Arguments = $"\"{scriptPath}\" \"{tempFilePath}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
