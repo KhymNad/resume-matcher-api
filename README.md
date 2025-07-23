@@ -1,6 +1,6 @@
 # 📄 ResumeMatcherAPI
 
-**ResumeMatcherAPI** is a full-stack AI-driven resume processing and job matching backend built using **ASP.NET Core** and **Python**. It extracts and parses resume text using a Python microservice, identifies key entities (skills, experience, education) via Hugging Face NER, matches skills against a Supabase-stored database, and fetches real-time job postings using the Adzuna API.
+**ResumeMatcherAPI** is a full-stack AI-driven resume processing and job matching backend built using **ASP.NET Core** and **Python**. It extracts and parses resume text using a Python script, identifies key entities (skills, experience, education) via Hugging Face NER, matches skills against a Supabase-stored database, and fetches real-time job postings using the Adzuna API.
 
 ---
 
@@ -8,7 +8,7 @@
 
 - 📤 Upload and parse resumes (PDF format)
 - 🧠 NLP-powered entity extraction using Hugging Face
-- 🐍 Python microservice for high-accuracy resume text extraction
+- 🐍 Python scripting for high-accuracy resume text extraction
 - 🔍 Match extracted skills with known industry skills (e.g., ESCO)
 - 🌐 Fetch relevant job postings from Adzuna based on parsed skills
 - 🔄 Swagger UI for interactive API testing
@@ -17,51 +17,29 @@
 ---
 
 ## 📁 Project Structure
+```bash
 ResumeMatcher.API/
-
 ├── Controllers/
-
 │ └── ResumeController.cs
-
 │ └── SupabaseController.cs
-
 ├── Services/
-
 │ ├── AdzunaJobService.cs
-
 │ ├── ApplicationDBContext.cs
-
 │ ├── FileTextExtractor.cs
-
 │ └── HuggingFaceNlpService.cs
-
-│ ├── PythonResumeParserService.cs
-
 │ └── SkillMatcher.cs
-
 ├── Helpers/
-
 │ └── ResumeControllerHelpers.cs
-
 ├── Python/
-
-│ ├── resume_parser.py # Flask microservice
-
-│ ├── requirements.txt
-
-│ └── Dockerfile # For Render deployment
-
+│ ├── parse_resume_script.py # internal Python script
+│ └── requirements.txt
 ├── appsettings.json
-
 ├── Program.cs
-
 ├── .env
-
 └── ResumeMatcher.API.csproj
-
 .render.yaml
-
 Dockerfile
+```
 
 ---
 
@@ -89,20 +67,6 @@ SUPABASE_CONNECTION_STRING=postgresql://user:password@host:port/database
 
 ---
 
-## 🐍 Start the Python Microservice (Locally)
-
-This service handles text extraction from resumes using PDFPlumber.
-
-```bash
-cd ResumeMatcherAPI/Python
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-flask run --host=0.0.0.0 --port=5001
-```
-
----
-
 ## ▶️ Start the .NET Web API (Locally)
 
 ```bash
@@ -111,6 +75,7 @@ dotnet restore
 dotnet run
 ```
 
+---
 
 ## 📡 API Endpoints
 Method	Endpoint	Description
@@ -123,6 +88,8 @@ POST	/api/resume/upload	Upload resume, extract + group entities
 
 POST	/api/resume/upload-with-jobs	Upload resume + return job matches (Adzuna)
 
+---
+
 ## 📦 Dependencies
 ASP.NET Core 6
 
@@ -132,7 +99,7 @@ Adzuna API
 
 Supabase (PostgreSQL + pgvector)
 
-Python 3.9 + Flask
+Python 3.9
 
 PDFPlumber (PDF parsing)
 
