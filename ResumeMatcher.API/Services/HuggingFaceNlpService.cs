@@ -13,7 +13,7 @@ namespace ResumeMatcherAPI.Services
         private readonly string? _apiKey;         // Hugging Face API key, loaded from configuration
 
         // The specific endpoint of the Hugging Face model
-        private const string Endpoint = "https://api-inference.huggingface.co/models/dslim/bert-base-NER";
+        private const string Endpoint = "https://router.huggingface.co/hf-inference/models/dslim/bert-base-NER";
         // private const string Endpoint = "https://api-inference.huggingface.co/models/julien-c/roberta-large-recruiter-ner";
 
         /// <summary>
@@ -46,7 +46,13 @@ namespace ResumeMatcherAPI.Services
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
             // Prepare the request body
-            var requestBody = new { inputs = resumeText };
+            var requestBody = new { 
+                inputs = resumeText,
+                parameters = new
+                {
+                    aggregation_strategy = "simple"
+                }
+            };
 
             // Serialize and set headers
             var content = new StringContent(JsonConvert.SerializeObject(requestBody), System.Text.Encoding.UTF8, "application/json");
