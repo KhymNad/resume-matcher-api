@@ -4,15 +4,14 @@
 
 ---
 
-## 🚀 Features
+## Features
 
-- 📤 Upload and parse resumes (PDF format)
-- 🧠 NLP-powered entity extraction using Hugging Face
-- 🐍 Python scripting for high-accuracy resume text extraction
-- 🔍 Match extracted skills with known industry skills (e.g., ESCO)
-- 🌐 Fetch relevant job postings from Adzuna based on parsed skills
-- 🔄 Swagger UI for interactive API testing
-- ☁️ Deployable to Render (multi-service architecture)
+- Upload and parse resumes (PDF format)
+- NLP-powered entity extraction using Hugging Face
+- Python scripting for high-accuracy resume text extraction
+- Match extracted skills with known industry skills (e.g., ESCO)
+- Fetch relevant job postings from Adzuna based on parsed skills
+- Deployable to Render (multi-service architecture)
 
 ---
 
@@ -53,7 +52,7 @@ Dockerfile
 
 ---
 
-## 🔐 Environment Variables
+## Environment Variables
 
 Create a `.env` file at the root of the .NET project or use Render’s Secret Environment system:
 
@@ -67,7 +66,7 @@ SUPABASE_CONNECTION_STRING=postgresql://user:password@host:port/database
 
 ---
 
-## ▶️ Start the .NET Web API (Locally)
+## Start the .NET Web API (Locally)
 
 ```bash
 cd ResumeMatcherAPI
@@ -77,7 +76,7 @@ dotnet run
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 Method	Endpoint	Description
 
 GET	/api/resume/health	Health check
@@ -90,7 +89,7 @@ POST	/api/resume/upload-with-jobs	Upload resume + return job matches (Adzuna)
 
 ---
 
-## 📦 Dependencies
+## Dependencies
 ASP.NET Core 6
 
 Hugging Face Transformers API
