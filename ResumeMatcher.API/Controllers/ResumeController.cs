@@ -69,7 +69,7 @@ namespace ResumeMatcherAPI.Controllers
         /// Uploads a resume, extracts structured data, and fetches relevant job postings.
         /// </summary>
         [HttpPost("upload-with-jobs")]
-        public async Task<IActionResult> UploadResumeWithJobs(IFormFile file, [FromQuery] string? countryCode = null)
+        public async Task<IActionResult> UploadResumeWithJobs([FromForm] IFormFile file, [FromQuery] string? countryCode = null)
         {
             var uploadResult = await UploadResume(file) as OkObjectResult;
 
