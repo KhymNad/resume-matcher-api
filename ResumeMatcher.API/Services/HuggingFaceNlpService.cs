@@ -14,7 +14,7 @@ namespace ResumeMatcherAPI.Services
 
         // The specific endpoint of the Hugging Face model
         // private const string Endpoint = "https://router.huggingface.co/hf-inference/models/dslim/bert-base-NER";
-        private const string Endpoint = "https://router.huggingface.co/hf-inference/models/julien-c/roberta-large-recruiter-ner";
+        private const string Endpoint = "https://router.huggingface.co/hf-inference/models/Jean-Baptiste/roberta-large-ner-english";
 
         /// <summary>
         /// Constructor that initializes the service with an injected HttpClient and configuration.
