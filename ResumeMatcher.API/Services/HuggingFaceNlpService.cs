@@ -47,11 +47,7 @@ namespace ResumeMatcherAPI.Services
 
             // Prepare the request body
             var requestBody = new { 
-                inputs = resumeText,
-                parameters = new
-                {
-                    aggregation_strategy = "simple"
-                }
+                inputs = resumeText
             };
 
             // Serialize and set headers
