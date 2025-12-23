@@ -161,7 +161,7 @@ namespace ResumeMatcherAPI.Helpers
         public static Dictionary<string, List<string>> GroupAndCleanEntities(List<HuggingFaceEntity> mergedEntities)
         {
             var groupedEntities = mergedEntities
-                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.80f)
+                .Where(e => !string.IsNullOrWhiteSpace(e.Entity) && e.Score >= 0.70f)
                 .GroupBy(e => MapToCategory(SimplifyEntityLabel(e.Entity ?? string.Empty)))
                 .ToDictionary(
                     g => g.Key,
