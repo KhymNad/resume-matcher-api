@@ -104,7 +104,7 @@ namespace ResumeMatcherAPI.Controllers
         /// groups entities by simplified labels, and returns them.
         /// </summary>
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadResume(IFormFile file)
+        public async Task<IActionResult> UploadResume([FromForm] IFormFile file)
         {
             if (file == null || file.Length == 0)   // Validate that a file was uploaded
                 return BadRequest("No file uploaded.");
