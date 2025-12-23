@@ -1,6 +1,6 @@
 # 📄 ResumeMatcherAPI
 
-**ResumeMatcherAPI** is a full-stack AI-driven resume processing and job matching backend built using **ASP.NET Core** and **Python**. It extracts and parses resume text using a Python script, identifies key entities (skills, experience, education) via Hugging Face NER, matches skills against a Supabase-stored database, and fetches real-time job postings using the Adzuna API.
+**ResumeMatcherAPI** is a full-stack AI-driven resume processing and job matching backend built using **ASP.NET Core** and **Python**. It extracts and parses resume text using a Python script, identifies key entities (skills, experience, education) via Hugging Face NER, and fetches real-time job postings using the Adzuna API.
 
 ---
 
@@ -8,8 +8,7 @@
 
 - Upload and parse resumes (PDF format)
 - NLP-powered entity extraction using Hugging Face
-- Python scripting for high-accuracy resume text extraction
-- Match extracted skills with known industry skills (e.g., ESCO)
+- Python scripting for resume text extraction
 - Fetch relevant job postings from Adzuna based on parsed skills
 - Deployable to Render (multi-service architecture)
 
