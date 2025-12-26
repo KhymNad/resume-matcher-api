@@ -14,7 +14,7 @@
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 ```bash
 ResumeMatcher.API/
 ├── Controllers/
@@ -41,7 +41,7 @@ Dockerfile
 
 ---
 
-## ⚙️ Prerequisites
+## Prerequisites
 
 - [.NET 6 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/6.0)
 - [Python 3.9+](https://www.python.org/downloads/)
