@@ -1,6 +1,10 @@
 # macOS
 .DS_Store
 
+# Build artifacts
+**/bin/
+**/obj/
+
 # Data folders
 Supabase/
 test-resumes/
