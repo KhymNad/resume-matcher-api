@@ -15,7 +15,7 @@ namespace ResumeMatcherAPI.Helpers
         /// </summary>
         public static IEnumerable<string> SplitTextIntoChunks(string text, int maxChunkSize = 1000)
         {
-            if (string.IsNullOrEmpty(text))
+            if (string.IsNullOrWhiteSpace(text))
                 yield break;
 
             int offset = 0;
