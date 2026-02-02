@@ -1,5 +1,35 @@
 # =====================
-# Node / React stuff
+# ResumeMatcher.API Specific
+# =====================
+
+# Ignore this notes file
+Notes.md
+
+# Supabase folder (one level up from ResumeMatcher.API)
+../Supabase/
+
+# Resume folders (one level up from ResumeMatcher.API)
+../test-resumes/
+../unique-resumes/
+
+# ESCO dataset
+../ESCO dataset - v1.1.1 - classification - en - csv/
+
+# Pipeline diagram
+../resume_matcher_api_pipeline.svg
+
+# Python cache and virtual environments
+Python/__pycache__/
+Python/venv/
+**/__pycache__/
+*.pyc
+
+# macOS system file
+.DS_Store
+../.DS_Store
+
+# =====================
+# Node / React stuff (if using in shared UI project)
 # =====================
 
 # dependencies
@@ -15,20 +45,13 @@
 /dist
 
 # misc
-.DS_Store
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
 # =====================
-# ASP.NET Core stuff
+# ASP.NET Core / .NET stuff
 # =====================
 
 # Build output
@@ -49,32 +72,31 @@ pnpm-debug.log*
 # Publish directory
 /publish/
 
-# Resharper files
+# ReSharper
 _ReSharper*/
 
 # Logs
 *.log
 
-# secret
+# =====================
+# Secrets / Configs
+# =====================
+
+# Environment variables
+.env
+
+# Ignore all appsettings (optional — up to you)
 appsettings.Development.json
 appsettings.json
 *.json
-# =====================
-# Misc
-# =====================
 
-# Mac system files
-.DS_Store
+# =====================
+# Miscellaneous
+# =====================
 
 # Ignore local database files
 /*.mdf
 /*.ldf
 
-# Ignore other env files
-/.env.*
-
-.drawio
-# =====================
-# Python
-# =====================
-Python/venv/
+# Draw.io diagrams
+*.drawio
