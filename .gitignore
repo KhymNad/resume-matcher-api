@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Data folders
+Supabase/
+test-resumes/
+unique-resumes/
+ESCO dataset - v1.1.1 - classification - en - csv/
+
+# Diagrams
+resume_matcher_api_pipeline.svg
+
+# Archived files
+ResumeMatcher.API/Controllers/archived-ResumeController.txt
