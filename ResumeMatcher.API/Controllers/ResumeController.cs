@@ -14,7 +14,7 @@ namespace ResumeMatcherAPI.Controllers
     public class ResumeController : ControllerBase
     {
         private readonly HuggingFaceNlpService _huggingFace; // Service to call Hugging Face API
-        private readonly FileTextExtractor _extractor;        // Service to extract text from resume files
+        private readonly IFileTextExtractor _extractor;       // Service to extract text from resume files
         private readonly AdzunaJobService _adzunaJobService; // Service to get job postings
         private readonly PythonResumeParserService _pythonParser; // Service to parse uploaded resume
 
@@ -22,7 +22,7 @@ namespace ResumeMatcherAPI.Controllers
         //private readonly string _dbConnectionString;
 
         // Constructor injects all required services
-        public ResumeController(HuggingFaceNlpService huggingFace, FileTextExtractor extractor, AdzunaJobService adzunaJobService, SkillService skillService, IConfiguration configuration, PythonResumeParserService pythonParser)
+        public ResumeController(HuggingFaceNlpService huggingFace, IFileTextExtractor extractor, AdzunaJobService adzunaJobService, SkillService skillService, IConfiguration configuration, PythonResumeParserService pythonParser)
         {
             _huggingFace = huggingFace;
             _extractor = extractor;

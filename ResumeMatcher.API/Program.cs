@@ -10,7 +10,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Npgsql;
 using Pgvector;
 
-DotNetEnv.Env.Load();
+// Load .env file if it exists (skip in testing environment)
+try { DotNetEnv.Env.Load(); } catch { /* .env file may not exist in test environment */ }
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +21,7 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 // Register Services
 builder.Services.AddControllers();
 builder.Services.AddHttpClient<HuggingFaceNlpService>();
-builder.Services.AddSingleton<FileTextExtractor>();
+builder.Services.AddSingleton<IFileTextExtractor, FileTextExtractor>();
 builder.Services.AddHttpClient<AdzunaJobService>();
 builder.Services.AddSingleton<AdzunaJobService>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -72,3 +73,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Expose the Program class for WebApplicationFactory in integration tests
+public partial class Program { }
