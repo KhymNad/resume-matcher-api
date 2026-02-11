@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace ResumeMatcherAPI.Services
 {
-    public class FileTextExtractor
+    public class FileTextExtractor : IFileTextExtractor
     {
         private readonly string _pythonServiceBaseUrl = "https://resume-parser-oysv.onrender.com"; // <-- updated for production
 
