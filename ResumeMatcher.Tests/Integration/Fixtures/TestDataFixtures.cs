@@ -170,6 +170,51 @@ Python, JavaScript, Docker, AWS, Français, Español, Português
         };
 
         public static object[] EmptyResponse => Array.Empty<object>();
+
+        public static object[] PythonDeveloper => new object[]
+        {
+            new { entity_group = "MISC", word = "Python", score = 0.92f, start = 0, end = 6 },
+            new { entity_group = "MISC", word = "developer", score = 0.85f, start = 7, end = 16 }
+        };
+
+        public static object[] FrontendDeveloper => new object[]
+        {
+            new { entity_group = "MISC", word = "React", score = 0.91f, start = 0, end = 5 },
+            new { entity_group = "MISC", word = "JavaScript", score = 0.89f, start = 10, end = 20 },
+            new { entity_group = "LOC", word = "New York", score = 0.88f, start = 30, end = 38 }
+        };
+    }
+
+    #endregion
+
+    #region Adzuna Job Responses
+
+    public static class AdzunaResponses
+    {
+        public static object PythonJobs => new
+        {
+            results = new[]
+            {
+                new
+                {
+                    title = "Python Developer",
+                    company = new { display_name = "Tech Corp" },
+                    location = new { display_name = "New York, NY" },
+                    description = "Python developer position",
+                    redirect_url = "https://jobs.example.com/python-1"
+                },
+                new
+                {
+                    title = "Senior Python Engineer",
+                    company = new { display_name = "Startup Inc" },
+                    location = new { display_name = "Remote" },
+                    description = "Senior Python engineer role",
+                    redirect_url = "https://jobs.example.com/python-2"
+                }
+            }
+        };
+
+        public static object EmptyJobs => new { results = Array.Empty<object>() };
     }
 
     #endregion
